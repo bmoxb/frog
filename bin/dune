@@ -1,0 +1,4 @@
+(executable
+ (public_name osaka)
+ (name main)
+ (libraries osaka))
