@@ -15,6 +15,9 @@ let is_digit = function '0' .. '9' -> true | _ -> false
 
 let is_whitespace = function ' ' | '\n' | '\t' -> true | _ -> false
 
+(* Buffers are used to construct lexeme strings efficiently for identifiers and
+   literals one character at a time. This function constructs a new buffer of a
+   sensible starting capacity for that purpose. *)
 let new_buf () = Buffer.create 10
 
 let char_to_buf c =
@@ -22,10 +25,14 @@ let char_to_buf c =
   Buffer.add_char buf c;
   buf
 
+(* Get the next character in the input stream without incrementing the current
+   position in the stream. *)
 let peek lexer =
   if lexer.index < String.length lexer.input then Some lexer.input.[lexer.index]
   else None
 
+(* Increment the current position in the input stream and update the current
+   line and character numbers. *)
 let advance lexer =
   match peek lexer with
   | Some peeked ->
@@ -43,6 +50,7 @@ let conditionally_advance cond ~if_match ~otherwise lexer =
   | Some peeked when cond peeked -> (advance lexer, if_match)
   | _ -> (lexer, otherwise)
 
+(* Advance until the first non-whitespace character is found (or EOF). *)
 let rec skip_whitespace lexer =
   match peek lexer with
   | Some peeked when is_whitespace peeked -> lexer |> advance |> skip_whitespace

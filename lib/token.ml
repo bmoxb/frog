@@ -41,8 +41,8 @@ type kind =
    source file. *)
 type t = { kind : kind; line_number : int; character_number : int }
 
-(* Match a lexeme to either a keyword token type or, if not a known keyword, an
-   identifier token type. *)
+(* Match a lexeme to either a keyword token kind or, if not a known keyword, an
+   identifier token kind. *)
 let lookup_identifier_or_keyword lexeme =
   match lexeme with
   | "fn" -> FnKeyword
