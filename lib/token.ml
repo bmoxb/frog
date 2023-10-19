@@ -1,4 +1,5 @@
 type ttype =
+  | Invalid of char
   | OpenBracket
   | CloseBracket
   | OpenCurly
@@ -8,6 +9,7 @@ type ttype =
   | Star
   | Slash
   | Equals
+  | Colon
   | Semicolon
   | Dot
   | Comma
