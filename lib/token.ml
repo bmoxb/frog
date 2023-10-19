@@ -1,5 +1,7 @@
+type invalid_ttype = UnexpectedChar of char | UnexpectedEOF
+
 type ttype =
-  | Invalid of char
+  | Invalid of invalid_ttype
   | OpenBracket
   | CloseBracket
   | OpenCurly

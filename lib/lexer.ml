@@ -29,10 +29,11 @@ let rec next_token lexer =
         | ';' -> (lexer, Semicolon)
         | '.' -> (lexer, Dot)
         | ',' -> (lexer, Comma)
+        | '"' -> handle_string lexer ""
         | c when is_digit c ->
             handle_number lexer (String.make 1 c) ~is_decimal:false
         | c when is_identifier c -> handle_identifier lexer (String.make 1 c)
-        | _ -> (lexer, Invalid c)
+        | _ -> (lexer, Invalid (UnexpectedChar c))
       in
       (lexer, Some (make_token lexer ttype))
 
@@ -75,6 +76,12 @@ and handle_number lexer lexeme ~is_decimal =
   | Some '.' when not is_decimal ->
       handle_number (advance lexer) (lexeme ^ ".") ~is_decimal:true
   | _ -> (lexer, Token.NumberLiteral lexeme)
+
+and handle_string lexer lexeme =
+  match peek lexer with
+  | Some '"' -> (advance lexer, Token.StringLiteral lexeme)
+  | Some peeked -> handle_string (advance lexer) (lexeme ^ String.make 1 peeked)
+  | None -> (lexer, Token.Invalid Token.UnexpectedEOF)
 
 and make_token lexer ttype : Token.t =
   {
