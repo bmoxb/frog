@@ -8,11 +8,12 @@ type t = {
 let init input = { input; index = 0; line_number = 1; character_number = 0 }
 
 let rec next_token lexer =
+  let lexer = skip_whitespace lexer in
   match peek lexer with
   | None -> (lexer, None) (* EOF *)
   | Some c ->
-      let lexer = advance lexer in
       let open Token in
+      let lexer = advance lexer in
       let lexer, ttype =
         match c with
         | '(' -> (lexer, OpenBracket)
@@ -53,9 +54,16 @@ and conditionally_advance lexer cond true_ttype false_ttype =
   | Some peeked when cond peeked -> (advance lexer, true_ttype)
   | _ -> (lexer, false_ttype)
 
+and skip_whitespace lexer =
+  match peek lexer with
+  | Some peeked when is_whitespace peeked -> skip_whitespace (advance lexer)
+  | _ -> lexer
+
 and make_token lexer ttype : Token.t =
   {
     ttype;
     line_number = lexer.line_number;
     character_number = lexer.character_number;
   }
+
+and is_whitespace c = List.mem c [ ' '; '\n'; '\t' ]
