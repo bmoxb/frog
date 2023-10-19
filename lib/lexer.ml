@@ -29,16 +29,16 @@ let rec next_token lexer =
         | ';' -> (lexer, Semicolon)
         | '.' -> (lexer, Dot)
         | ',' -> (lexer, Comma)
-        | c when is_identifier_char c ->
-            handle_identifier lexer (String.make 1 c)
+        | c when is_digit c ->
+            handle_number lexer (String.make 1 c) ~is_decimal:false
+        | c when is_identifier c -> handle_identifier lexer (String.make 1 c)
         | _ -> (lexer, Invalid c)
       in
       (lexer, Some (make_token lexer ttype))
 
 and skip_whitespace lexer =
   match peek lexer with
-  | Some peeked when is_whitespace_char peeked ->
-      skip_whitespace (advance lexer)
+  | Some peeked when is_whitespace peeked -> skip_whitespace (advance lexer)
   | _ -> lexer
 
 and peek lexer =
@@ -64,9 +64,17 @@ and conditionally_advance lexer cond true_ttype false_ttype =
 
 and handle_identifier lexer lexeme =
   match peek lexer with
-  | Some peeked when is_identifier_char peeked ->
+  | Some peeked when is_identifier peeked ->
       handle_identifier (advance lexer) (lexeme ^ String.make 1 peeked)
   | _ -> (lexer, Token.lookup_identifier_or_keyword lexeme)
+
+and handle_number lexer lexeme ~is_decimal =
+  match peek lexer with
+  | Some peeked when is_digit peeked ->
+      handle_number (advance lexer) (lexeme ^ String.make 1 peeked) ~is_decimal
+  | Some '.' when not is_decimal ->
+      handle_number (advance lexer) (lexeme ^ ".") ~is_decimal:true
+  | _ -> (lexer, Token.NumberLiteral lexeme)
 
 and make_token lexer ttype : Token.t =
   {
@@ -75,8 +83,10 @@ and make_token lexer ttype : Token.t =
     character_number = lexer.character_number;
   }
 
-and is_whitespace_char = function ' ' | '\n' | '\t' -> true | _ -> false
+and is_whitespace = function ' ' | '\n' | '\t' -> true | _ -> false
 
-and is_identifier_char = function
+and is_identifier = function
   | 'a' .. 'z' | 'A' .. 'Z' | '0' .. '9' | '_' -> true
   | _ -> false
+
+and is_digit = function '0' .. '9' -> true | _ -> false

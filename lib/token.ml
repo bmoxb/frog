@@ -27,8 +27,7 @@ type ttype =
   | AffineKeyword
   (* Literals *)
   | StringLiteral of string
-  | IntLiteral of int
-  | FloatLiteral of float
+  | NumberLiteral of string
 [@@deriving show]
 
 (* Represents a single token of some token type and at some position within a
