@@ -35,6 +35,18 @@ let rec next_token lexer =
         | ';' -> (lexer, Semicolon)
         | '.' -> (lexer, Dot)
         | ',' -> (lexer, Comma)
+        | '!' ->
+            conditionally_advance lexer
+              (fun c -> c = '=')
+              ~if_match:NotEquiv ~otherwise:Exclamation
+        | '>' ->
+            conditionally_advance lexer
+              (fun c -> c = '=')
+              ~if_match:GreaterThanOrEqual ~otherwise:GreaterThan
+        | '<' ->
+            conditionally_advance lexer
+              (fun c -> c = '=')
+              ~if_match:LessThanOrEqual ~otherwise:LessThan
         | '"' -> handle_string lexer ""
         | c when is_digit c ->
             handle_number lexer (String.make 1 c) ~is_decimal:false

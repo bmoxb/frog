@@ -15,8 +15,14 @@ type kind =
   | Semicolon
   | Dot
   | Comma
+  | Exclamation
+  | GreaterThan
+  | LessThan
   | Arrow (* -> *)
+  | NotEquiv (* != *)
   | Equiv (* == *)
+  | GreaterThanOrEqual (* >= *)
+  | LessThanOrEqual (* <= *)
   (* Identifiers / Keywords *)
   | Identifier of string
   | FnKeyword
@@ -30,12 +36,10 @@ type kind =
   (* Literals *)
   | StringLiteral of string
   | NumberLiteral of string
-[@@deriving show]
 
 (* Represents a single token of some token kind and at some position within a
    source file. *)
 type t = { kind : kind; line_number : int; character_number : int }
-[@@deriving show]
 
 (* Match a lexeme to either a keyword token type or, if not a known keyword, an
    identifier token type. *)
