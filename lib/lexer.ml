@@ -29,9 +29,17 @@ let rec next_token lexer =
         | ';' -> (lexer, Semicolon)
         | '.' -> (lexer, Dot)
         | ',' -> (lexer, Comma)
+        | c when is_identifier_char c ->
+            handle_identifier lexer (String.make 1 c)
         | _ -> (lexer, Invalid c)
       in
       (lexer, Some (make_token lexer ttype))
+
+and skip_whitespace lexer =
+  match peek lexer with
+  | Some peeked when is_whitespace_char peeked ->
+      skip_whitespace (advance lexer)
+  | _ -> lexer
 
 and peek lexer =
   if lexer.index < String.length lexer.input then Some lexer.input.[lexer.index]
@@ -54,10 +62,11 @@ and conditionally_advance lexer cond true_ttype false_ttype =
   | Some peeked when cond peeked -> (advance lexer, true_ttype)
   | _ -> (lexer, false_ttype)
 
-and skip_whitespace lexer =
+and handle_identifier lexer lexeme =
   match peek lexer with
-  | Some peeked when is_whitespace peeked -> skip_whitespace (advance lexer)
-  | _ -> lexer
+  | Some peeked when is_identifier_char peeked ->
+      handle_identifier (advance lexer) (lexeme ^ String.make 1 peeked)
+  | _ -> (lexer, Token.Identifier lexeme)
 
 and make_token lexer ttype : Token.t =
   {
@@ -66,4 +75,8 @@ and make_token lexer ttype : Token.t =
     character_number = lexer.character_number;
   }
 
-and is_whitespace c = List.mem c [ ' '; '\n'; '\t' ]
+and is_whitespace_char = function ' ' | '\n' | '\t' -> true | _ -> false
+
+and is_identifier_char = function
+  | 'a' .. 'z' | 'A' .. 'Z' | '0' .. '9' | '_' -> true
+  | _ -> false
