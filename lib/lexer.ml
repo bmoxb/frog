@@ -66,7 +66,7 @@ and handle_identifier lexer lexeme =
   match peek lexer with
   | Some peeked when is_identifier_char peeked ->
       handle_identifier (advance lexer) (lexeme ^ String.make 1 peeked)
-  | _ -> (lexer, Token.Identifier lexeme)
+  | _ -> (lexer, Token.lookup_identifier_or_keyword lexeme)
 
 and make_token lexer ttype : Token.t =
   {
