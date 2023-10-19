@@ -14,17 +14,23 @@ let rec next_token lexer =
   | Some c ->
       let open Token in
       let lexer = advance lexer in
-      let lexer, ttype =
+      let lexer, token_kind =
         match c with
         | '(' -> (lexer, OpenBracket)
         | ')' -> (lexer, CloseBracket)
         | '{' -> (lexer, OpenCurly)
         | '}' -> (lexer, CloseCurly)
         | '+' -> (lexer, Plus)
-        | '-' -> conditionally_advance lexer (fun c -> c = '>') Arrow Minus
+        | '-' ->
+            conditionally_advance lexer
+              (fun c -> c = '>')
+              ~if_match:Arrow ~otherwise:Minus
         | '*' -> (lexer, Star)
         | '/' -> (lexer, Slash)
-        | '=' -> conditionally_advance lexer (fun c -> c = '=') Equiv Equals
+        | '=' ->
+            conditionally_advance lexer
+              (fun c -> c = '=')
+              ~if_match:Equiv ~otherwise:Equals
         | ':' -> (lexer, Colon)
         | ';' -> (lexer, Semicolon)
         | '.' -> (lexer, Dot)
@@ -35,7 +41,7 @@ let rec next_token lexer =
         | c when is_identifier c -> handle_identifier lexer (String.make 1 c)
         | _ -> (lexer, Invalid (UnexpectedChar c))
       in
-      (lexer, Some (make_token lexer ttype))
+      (lexer, Some (make_token lexer token_kind))
 
 and skip_whitespace lexer =
   match peek lexer with
@@ -58,10 +64,10 @@ and advance lexer =
       { lexer with index = lexer.index + 1; line_number; character_number }
   | None -> lexer
 
-and conditionally_advance lexer cond true_ttype false_ttype =
+and conditionally_advance lexer cond ~if_match ~otherwise =
   match peek lexer with
-  | Some peeked when cond peeked -> (advance lexer, true_ttype)
-  | _ -> (lexer, false_ttype)
+  | Some peeked when cond peeked -> (advance lexer, if_match)
+  | _ -> (lexer, otherwise)
 
 and handle_identifier lexer lexeme =
   match peek lexer with
@@ -83,9 +89,9 @@ and handle_string lexer lexeme =
   | Some peeked -> handle_string (advance lexer) (lexeme ^ String.make 1 peeked)
   | None -> (lexer, Token.Invalid Token.UnexpectedEOF)
 
-and make_token lexer ttype : Token.t =
+and make_token lexer kind : Token.t =
   {
-    ttype;
+    kind;
     line_number = lexer.line_number;
     character_number = lexer.character_number;
   }

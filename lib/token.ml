@@ -1,7 +1,7 @@
-type invalid_ttype = UnexpectedChar of char | UnexpectedEOF
+type invalid_kind = UnexpectedChar of char | UnexpectedEOF
 
-type ttype =
-  | Invalid of invalid_ttype
+type kind =
+  | Invalid of invalid_kind
   | OpenBracket
   | CloseBracket
   | OpenCurly
@@ -32,9 +32,9 @@ type ttype =
   | NumberLiteral of string
 [@@deriving show]
 
-(* Represents a single token of some token type and at some position within a
+(* Represents a single token of some token kind and at some position within a
    source file. *)
-type t = { ttype : ttype; line_number : int; character_number : int }
+type t = { kind : kind; line_number : int; character_number : int }
 [@@deriving show]
 
 (* Match a lexeme to either a keyword token type or, if not a known keyword, an
