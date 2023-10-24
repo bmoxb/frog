@@ -1,4 +1,4 @@
-type invalid_kind = UnexpectedChar of char | UnexpectedEOF
+type invalid_kind = UnexpectedChar of char | UnexpectedEOF [@@deriving show]
 
 type kind =
   | Invalid of invalid_kind
@@ -36,10 +36,12 @@ type kind =
   (* Literals *)
   | StringLiteral of string
   | NumberLiteral of string
+[@@deriving show]
 
 (* Represents a single token of some token kind and at some position within a
    source file. *)
 type t = { kind : kind; line_number : int; character_number : int }
+[@@deriving show]
 
 (* Match a lexeme to either a keyword token kind or, if not a known keyword, an
    identifier token kind. *)
