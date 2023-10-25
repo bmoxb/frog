@@ -1,4 +1,7 @@
-type ttype =
+type invalid_kind = UnexpectedChar of char | UnexpectedEOF [@@deriving show]
+
+type kind =
+  | Invalid of invalid_kind
   | OpenBracket
   | CloseBracket
   | OpenCurly
@@ -8,11 +11,18 @@ type ttype =
   | Star
   | Slash
   | Equals
+  | Colon
   | Semicolon
   | Dot
   | Comma
+  | Exclamation
+  | GreaterThan
+  | LessThan
   | Arrow (* -> *)
+  | NotEquiv (* != *)
   | Equiv (* == *)
+  | GreaterThanOrEqual (* >= *)
+  | LessThanOrEqual (* <= *)
   (* Identifiers / Keywords *)
   | Identifier of string
   | FnKeyword
@@ -25,17 +35,16 @@ type ttype =
   | AffineKeyword
   (* Literals *)
   | StringLiteral of string
-  | IntLiteral of int
-  | FloatLiteral of float
+  | NumberLiteral of string
 [@@deriving show]
 
-(* Represents a single token of some token type and at some position within a
+(* Represents a single token of some token kind and at some position within a
    source file. *)
-type t = { ttype : ttype; line_number : int; character_number : int }
+type t = { kind : kind; line_number : int; character_number : int }
 [@@deriving show]
 
-(* Match a lexeme to either a keyword token type or, if not a known keyword, an
-   identifier token type. *)
+(* Match a lexeme to either a keyword token kind or, if not a known keyword, an
+   identifier token kind. *)
 let lookup_identifier_or_keyword lexeme =
   match lexeme with
   | "fn" -> FnKeyword
