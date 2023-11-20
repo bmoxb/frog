@@ -25,14 +25,14 @@ type kind =
   | LessThanOrEqual (* <= *)
   (* Identifiers / Keywords *)
   | Identifier of string
-  | FnKeyword
-  | ReturnKeyword
+  | NotKeyword
+  | AndKeyword
+  | OrKeyword
   | IfKeyword
+  | ThenKeyword
   | ElseKeyword
-  | WhileKeyword
-  | StructKeyword
-  | LinearKeyword
-  | AffineKeyword
+  | LetKeyword
+  | InKeyword
   (* Literals *)
   | StringLiteral of string
   | NumberLiteral of string
@@ -47,12 +47,12 @@ type t = { kind : kind; line_number : int; character_number : int }
    identifier token kind. *)
 let lookup_identifier_or_keyword lexeme =
   match lexeme with
-  | "fn" -> FnKeyword
-  | "return" -> ReturnKeyword
+  | "not" -> NotKeyword
+  | "and" -> AndKeyword
+  | "or" -> OrKeyword
   | "if" -> IfKeyword
+  | "then" -> ThenKeyword
   | "else" -> ElseKeyword
-  | "while" -> WhileKeyword
-  | "struct" -> StructKeyword
-  | "linear" -> LinearKeyword
-  | "affine" -> AffineKeyword
+  | "let" -> LetKeyword
+  | "in" -> InKeyword
   | _ -> Identifier lexeme
