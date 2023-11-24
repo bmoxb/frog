@@ -36,11 +36,9 @@ let rec parse_expr parser =
       (parser, Some (Ok expr))
     with ErrException err -> (parser, Some (Error err))
 
-and expr parser = let_binding parser
-
-and let_binding parser =
+and expr parser =
   let open Token in
-  let peeked_let_keyword parser =
+  let let_binding parser =
     let parser, let_token = advance parser in
     match advance parser with
     | parser, ({ kind = Identifier _; _ } as identifier_token) ->
@@ -69,7 +67,7 @@ and let_binding parser =
           "Expected an identifier to bind an expression to."
   in
   match peek_kind parser with
-  | Some LetKeyword -> peeked_let_keyword parser
+  | Some LetKeyword -> let_binding parser
   | _ -> logical parser
 
 and logical parser =
