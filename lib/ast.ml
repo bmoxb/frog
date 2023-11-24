@@ -1,7 +1,7 @@
 type expr =
   | LetBinding of {
       let_token : Token.t;
-      identifier : Token.t;
+      identifier_token : Token.t;
       equals_token : Token.t;
       bound_expr : expr;
       in_token : Token.t;
@@ -34,8 +34,8 @@ let display_expr expr =
   let rec display_expr' expr indent_level =
     let indent = make_indent indent_level true in
     match expr with
-    | LetBinding { identifier; bound_expr; body_expr; _ } ->
-        let identifier = Token.show_kind identifier.kind in
+    | LetBinding { identifier_token; bound_expr; body_expr; _ } ->
+        let identifier = Token.show_kind identifier_token.kind in
         let bound = display_expr' bound_expr (indent_level + 1) in
         let body = display_expr' body_expr (indent_level + 1) in
         sprintf "%slet %s =\n%s\n%sin%s" indent identifier bound indent body

@@ -43,7 +43,7 @@ and let_binding parser =
   let peeked_let_keyword parser =
     let parser, let_token = advance parser in
     match advance parser with
-    | parser, ({ kind = Identifier _; _ } as identifier) ->
+    | parser, ({ kind = Identifier _; _ } as identifier_token) ->
         let parser, equals_token =
           expect_kind Equals "Expected '=' token." parser
         in
@@ -56,7 +56,7 @@ and let_binding parser =
           Ast.LetBinding
             {
               let_token;
-              identifier;
+              identifier_token;
               equals_token;
               bound_expr;
               in_token;
