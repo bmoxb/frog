@@ -47,8 +47,8 @@ let advance lexer =
 
 let conditionally_advance cond ~if_match ~otherwise lexer =
   match peek lexer with
-  | Some peeked when cond peeked -> (advance lexer, if_match)
-  | _ -> (lexer, otherwise)
+  | Some peeked when cond peeked -> (advance lexer, Ok if_match)
+  | _ -> (lexer, Ok otherwise)
 
 (* Advance until the first non-whitespace character is found (or EOF). *)
 let rec skip_whitespace lexer =
@@ -60,11 +60,11 @@ let rec handle_string lexeme_buf lexer =
   match peek lexer with
   | Some '"' ->
       let lexeme = Buffer.contents lexeme_buf in
-      (advance lexer, Token.StringLiteral lexeme)
+      (advance lexer, Ok (Token.StringLiteral lexeme))
   | Some peeked ->
       Buffer.add_char lexeme_buf peeked;
       lexer |> advance |> handle_string lexeme_buf
-  | None -> (lexer, Token.Invalid Token.UnexpectedEOF)
+  | None -> (lexer, Error Err.UnexpectedEOF)
 
 let rec handle_number ?(is_decimal = false) lexeme_buf lexer =
   match peek lexer with
@@ -76,7 +76,7 @@ let rec handle_number ?(is_decimal = false) lexeme_buf lexer =
       lexer |> advance |> handle_number ~is_decimal:true lexeme_buf
   | _ ->
       let lexeme = Buffer.contents lexeme_buf in
-      (lexer, Token.NumberLiteral lexeme)
+      (lexer, Ok (Token.NumberLiteral lexeme))
 
 let rec handle_identifier lexeme_buf lexer =
   match peek lexer with
@@ -85,7 +85,7 @@ let rec handle_identifier lexeme_buf lexer =
       lexer |> advance |> handle_identifier lexeme_buf
   | _ ->
       let lexeme = Buffer.contents lexeme_buf in
-      (lexer, Token.lookup_identifier_or_keyword lexeme)
+      (lexer, Ok (Token.lookup_identifier_or_keyword lexeme))
 
 let make_token kind lexer : Token.t =
   {
@@ -101,27 +101,27 @@ let next_token lexer =
   | Some c ->
       let open Token in
       let lexer = advance lexer in
-      let lexer, token_kind =
+      let lexer, token_kind_result =
         match c with
-        | '(' -> (lexer, OpenBracket)
-        | ')' -> (lexer, CloseBracket)
-        | '{' -> (lexer, OpenCurly)
-        | '}' -> (lexer, CloseCurly)
-        | '+' -> (lexer, Plus)
+        | '(' -> (lexer, Ok OpenBracket)
+        | ')' -> (lexer, Ok CloseBracket)
+        | '{' -> (lexer, Ok OpenCurly)
+        | '}' -> (lexer, Ok CloseCurly)
+        | '+' -> (lexer, Ok Plus)
         | '-' ->
             conditionally_advance
               (fun c -> c = '>')
               ~if_match:Arrow ~otherwise:Minus lexer
-        | '*' -> (lexer, Star)
-        | '/' -> (lexer, Slash)
+        | '*' -> (lexer, Ok Star)
+        | '/' -> (lexer, Ok Slash)
         | '=' ->
             conditionally_advance
               (fun c -> c = '=')
               ~if_match:Equiv ~otherwise:Equals lexer
-        | ':' -> (lexer, Colon)
-        | ';' -> (lexer, Semicolon)
-        | '.' -> (lexer, Dot)
-        | ',' -> (lexer, Comma)
+        | ':' -> (lexer, Ok Colon)
+        | ';' -> (lexer, Ok Semicolon)
+        | '.' -> (lexer, Ok Dot)
+        | ',' -> (lexer, Ok Comma)
         | '!' ->
             conditionally_advance
               (fun c -> c = '=')
@@ -137,6 +137,20 @@ let next_token lexer =
         | '"' -> handle_string (new_buf ()) lexer
         | c when is_digit c -> handle_number (char_to_buf c) lexer
         | c when is_identifier c -> handle_identifier (char_to_buf c) lexer
-        | _ -> (lexer, Invalid (UnexpectedChar c))
+        | _ ->
+            let lexical_error =
+              Err.Lexical
+                {
+                  character = c;
+                  line_number = lexer.line_number;
+                  character_number = lexer.character_number;
+                }
+            in
+            (lexer, Error lexical_error)
       in
-      (lexer, Some (make_token token_kind lexer))
+      let token_result =
+        match token_kind_result with
+        | Ok token_kind -> Ok (make_token token_kind lexer)
+        | Error err -> Error err
+      in
+      (lexer, Some token_result)

@@ -1,7 +1,4 @@
-type invalid_kind = UnexpectedChar of char | UnexpectedEOF [@@deriving show]
-
 type kind =
-  | Invalid of invalid_kind
   | OpenBracket
   | CloseBracket
   | OpenCurly
