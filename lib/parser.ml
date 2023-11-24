@@ -110,7 +110,7 @@ and primary parser =
   match peek_kind parser with
   | Some (NumberLiteral _) | Some (StringLiteral _) | Some (Identifier _) ->
       let parser, token = advance parser in
-      (parser, Ast.Literal token)
+      (parser, Ast.Primary token)
   | Some OpenBracket ->
       let parser, open_bracket_token = advance parser in
       let parser, expr = expr parser in

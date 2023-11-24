@@ -18,8 +18,7 @@ type expr =
       close_bracket_token : Token.t;
       expr : expr;
     }
-  | Literal of Token.t
-  | Identifier of Token.t
+  | Primary of Token.t
 [@@deriving show]
 
 (* Construct a human-readable representation of an expression that shows just
@@ -51,6 +50,6 @@ let show_expr_simple expr =
     | Group { expr; _ } ->
         let show_expr = make_representation expr (indent_level + 1) in
         indent ^ "group\n" ^ show_expr
-    | Literal tok | Identifier tok -> indent ^ Token.show_kind tok.kind
+    | Primary tok -> indent ^ Token.show_kind tok.kind
   in
   make_representation expr 0
