@@ -5,13 +5,13 @@ type syntax = { token : Token.t; msg : string }
 type t = UnexpectedEOF | Lexical of lexical | Syntax of syntax
 
 let display err input_filename =
-  let open Printf in
   let lineno, charno, msg =
     match err with
     | UnexpectedEOF -> (0, 0, "Unexpected EOF.")
     | Lexical { character; line_number; character_number } ->
         let msg =
-          sprintf "Lexical error: Expected character '%c' in input." character
+          Printf.sprintf "Lexical error: Expected character '%c' in input."
+            character
         in
         (line_number, character_number, msg)
     | Syntax { token; msg } ->
