@@ -1,14 +1,17 @@
 open Osaka
 open OUnit2
 
-let test_valid_token name input expected_token =
-  name >:: fun _ ->
-  let _, output = input |> Lexer.init |> Lexer.next_token in
+let assert_valid_token expected_token output =
   match output with
   | Some (Ok token) -> assert_equal token expected_token ~printer:Token.show
   | Some (Error _) ->
       assert_failure "Function next_token gave unexpected error."
   | None -> assert_failure "Unexpected end of token stream."
+
+let test_valid_token name input expected_token =
+  name >:: fun _ ->
+  let _, output = input |> Lexer.init |> Lexer.next_token in
+  assert_valid_token expected_token output
 
 let test_valid_tokens name_prefix input_kind_pairs =
   List.map
@@ -42,6 +45,18 @@ let test_valid_string_literal_tokens inputs =
 let test_valid_number_literal_tokens inputs =
   test_valid_tokens "number literal"
     (List.map (fun s -> (s, Token.NumberLiteral s)) inputs)
+
+let test_valid_token_stream name input expected_tokens =
+  name >:: fun _ ->
+  let rec assert_tokens lexer expected_tokens =
+    match expected_tokens with
+    | expected_token :: tail ->
+        let lexer, output = Lexer.next_token lexer in
+        assert_valid_token expected_token output;
+        assert_tokens lexer tail
+    | [] -> ()
+  in
+  assert_tokens (Lexer.init input) expected_tokens
 
 let tests =
   "lexer"
@@ -86,5 +101,41 @@ let tests =
            [ "\"\""; "\"Hello, world!\""; "\"123\"" ]
        @ test_valid_number_literal_tokens
            [ "0"; "10"; "123456789"; "0.1"; "1."; "135.790001000300050007" ]
+       @ [
+           test_valid_token_stream "repeated = signs" " ===== "
+             [
+               { kind = Token.Equiv; line_number = 1; character_number = 3 };
+               { kind = Token.Equiv; line_number = 1; character_number = 5 };
+               { kind = Token.Equals; line_number = 1; character_number = 6 };
+             ];
+           test_valid_token_stream "dot before number literal" ".5\n5."
+             [
+               { kind = Token.Dot; line_number = 1; character_number = 1 };
+               {
+                 kind = Token.NumberLiteral "5";
+                 line_number = 1;
+                 character_number = 2;
+               };
+               {
+                 kind = Token.NumberLiteral "5.";
+                 line_number = 2;
+                 character_number = 2;
+               };
+             ];
+           test_valid_token_stream "multiple string literals"
+             "\"abc\"\"def\nghi\""
+             [
+               {
+                 kind = Token.StringLiteral "abc";
+                 line_number = 1;
+                 character_number = 5;
+               };
+               {
+                 kind = Token.StringLiteral "def\nghi";
+                 line_number = 2;
+                 character_number = 4;
+               };
+             ];
+         ]
 
 let () = run_test_tt_main tests
