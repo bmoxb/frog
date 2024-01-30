@@ -3,7 +3,7 @@ open OUnit2
 
 let assert_valid_token expected_token output =
   match output with
-  | Some (Ok token) -> assert_equal token expected_token ~printer:Token.show
+  | Some (Ok token) -> assert_equal expected_token token ~printer:Token.show
   | Some (Error _) ->
       assert_failure "Function next_token gave unexpected error."
   | None -> assert_failure "Unexpected end of token stream."
