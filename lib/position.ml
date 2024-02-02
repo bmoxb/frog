@@ -6,21 +6,22 @@ type t = { start_offset : int; end_offset : int } [@@deriving show]
 (* Represents a human-readable position in a source file. *)
 type specific = {
   start_line_number : int;
-  end_line_number : int;
   start_character_number : int;
+  end_line_number : int;
   end_character_number : int;
 }
+[@@deriving show]
 
 let determine_specific_position source offsets =
   let rec find_line_char target_index ~index ~line ~char =
-    let new_line, new_char =
-      match source.[index] with
-      | '\n' -> (line + 1, 0)
-      | '\t' -> (line, char + 4)
-      | _ -> (line, char + 1)
-    in
-    if target_index == index then (new_line, new_char)
+    if target_index == index then (line, char)
     else
+      let new_line, new_char =
+        match source.[index] with
+        | '\n' -> (line + 1, 0)
+        | '\t' -> (line, char + 4)
+        | _ -> (line, char + 1)
+      in
       find_line_char target_index ~index:(index + 1) ~line:new_line
         ~char:new_char
   in
@@ -33,7 +34,7 @@ let determine_specific_position source offsets =
   in
   {
     start_line_number;
-    end_line_number;
     start_character_number;
+    end_line_number;
     end_character_number;
   }
