@@ -20,8 +20,7 @@ let test_valid_tokens name_prefix input_kind_pairs =
       let expected_token : Token.t =
         {
           kind = expected_kind;
-          line_number = 1;
-          character_number = String.length input;
+          position = { start_offset = 0; end_offset = String.length input };
         }
       in
       test_valid_token name input expected_token)
@@ -104,22 +103,32 @@ let tests =
        @ [
            test_valid_token_stream "repeated = signs" " ===== "
              [
-               { kind = Token.Equiv; line_number = 1; character_number = 3 };
-               { kind = Token.Equiv; line_number = 1; character_number = 5 };
-               { kind = Token.Equals; line_number = 1; character_number = 6 };
+               {
+                 kind = Token.Equiv;
+                 position = { start_offset = 1; end_offset = 3 };
+               };
+               {
+                 kind = Token.Equiv;
+                 position = { start_offset = 3; end_offset = 5 };
+               };
+               {
+                 kind = Token.Equals;
+                 position = { start_offset = 5; end_offset = 6 };
+               };
              ];
            test_valid_token_stream "dot before number literal" ".5\n5."
              [
-               { kind = Token.Dot; line_number = 1; character_number = 1 };
+               {
+                 kind = Token.Dot;
+                 position = { start_offset = 0; end_offset = 1 };
+               };
                {
                  kind = Token.NumberLiteral "5";
-                 line_number = 1;
-                 character_number = 2;
+                 position = { start_offset = 1; end_offset = 2 };
                };
                {
                  kind = Token.NumberLiteral "5.";
-                 line_number = 2;
-                 character_number = 2;
+                 position = { start_offset = 3; end_offset = 5 };
                };
              ];
            test_valid_token_stream "multiple string literals"
@@ -127,13 +136,11 @@ let tests =
              [
                {
                  kind = Token.StringLiteral "abc";
-                 line_number = 1;
-                 character_number = 5;
+                 position = { start_offset = 0; end_offset = 5 };
                };
                {
                  kind = Token.StringLiteral "def\nghi";
-                 line_number = 2;
-                 character_number = 4;
+                 position = { start_offset = 5; end_offset = 14 };
                };
              ];
          ]
