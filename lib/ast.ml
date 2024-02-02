@@ -1,56 +1,140 @@
-type expr =
-  | LetBinding of {
-      let_token : Token.t;
-      identifier_token : Token.t;
-      equals_token : Token.t;
-      bound_expr : expr;
-      in_token : Token.t;
-      body_expr : expr;
-    }
-  | BinaryExpr of {
-      operator_token : Token.t;
-      left_expr : expr;
-      right_expr : expr;
-    }
-  | UnaryExpr of { operator_token : Token.t; expr : expr }
-  | Group of {
-      open_bracket_token : Token.t;
-      close_bracket_token : Token.t;
-      expr : expr;
-    }
-  | Primary of Token.t
+type identifier = string [@@deriving show]
+
+module Pattern = struct
+  (* TODO *)
+  type t = Identifier of identifier [@@deriving show]
+
+  let to_graph pattern : Graph.t =
+    match pattern with Identifier identifier -> Graph.leaf identifier
+end
+
+module DataType = struct
+  (* TODO *)
+  type t = Identifier of identifier [@@deriving show]
+
+  let to_graph data_type : Graph.t =
+    match data_type with Identifier identifier -> Graph.leaf identifier
+end
+
+module Expr = struct
+  type binary_operator =
+    | And
+    | Or
+    | Equiv
+    | NotEquiv
+    | GreaterThan
+    | LessThan
+    | GreaterThanOrEqual
+    | LessThanOrEqual
+    | Add
+    | Subtract
+    | Multiply
+    | Divide
+  [@@deriving show]
+
+  let display_binary_operator = function
+    | And -> "and"
+    | Or -> "or"
+    | Equiv -> "=="
+    | NotEquiv -> "!="
+    | GreaterThan -> ">"
+    | LessThan -> "<"
+    | GreaterThanOrEqual -> ">="
+    | LessThanOrEqual -> "<="
+    | Add -> "+"
+    | Subtract -> "-"
+    | Multiply -> "*"
+    | Divide -> "/"
+
+  type unary_operator = Not | Negate [@@deriving show]
+
+  let display_unary_operator = function Not -> "not" | Negate -> "-"
+
+  type t = { position : Position.t; kind : kind } [@@deriving show]
+
+  and kind =
+    (* "let" pattern "=" expr "in" expr *)
+    | LetIn of Pattern.t * DataType.t * t
+    (*| Match of t*)
+    (* "if" expr "then" expr "else" expr *)
+    | IfThenElse of t * t * t
+    (* expr binary_operator expr *)
+    | BinOp of binary_operator * t * t
+    (* unary_operator expr *)
+    | UnaryOp of unary_operator * t
+    (* "(" expr ")" *)
+    | Grouping of t
+    | Identifier of identifier
+  [@@deriving show]
+
+  let rec to_graph expr : Graph.t =
+    match expr.kind with
+    | LetIn (pattern, data_type, expr) ->
+        {
+          vertex_label = "let";
+          edges =
+            [
+              { edge_label = "pattern"; vertex = Pattern.to_graph pattern };
+              { edge_label = "type"; vertex = DataType.to_graph data_type };
+              { edge_label = "in"; vertex = to_graph expr };
+            ];
+        }
+    | IfThenElse (condition, then_expr, else_expr) ->
+        {
+          vertex_label = "if";
+          edges =
+            [
+              { edge_label = "condition"; vertex = to_graph condition };
+              { edge_label = "then"; vertex = to_graph then_expr };
+              { edge_label = "else"; vertex = to_graph else_expr };
+            ];
+        }
+    | BinOp (op, lhs, rhs) ->
+        {
+          vertex_label = "binary operation";
+          edges =
+            [
+              { edge_label = "lhs"; vertex = to_graph lhs };
+              {
+                edge_label = "op";
+                vertex = Graph.leaf (display_binary_operator op);
+              };
+              { edge_label = "rhs"; vertex = to_graph rhs };
+            ];
+        }
+    | UnaryOp (op, expr) ->
+        {
+          vertex_label = "unary operation";
+          edges =
+            [
+              {
+                edge_label = "op";
+                vertex = Graph.leaf (display_unary_operator op);
+              };
+              { edge_label = "expr"; vertex = to_graph expr };
+            ];
+        }
+    | Grouping expr ->
+        {
+          vertex_label = "grouping";
+          edges = [ { edge_label = "expr"; vertex = to_graph expr } ];
+        }
+    | Identifier identifier ->
+        {
+          vertex_label = "identifier";
+          edges = [ Graph.unlabelled_edge (Graph.leaf identifier) ];
+        }
+end
+
+type top_level_kind =
+  (* "let" pattern ":" type "=" expr *)
+  | Let of Pattern.t * DataType.t * Expr.t
+  (* "alias" IDENTIFIER "=" type *)
+  | Alias of identifier * DataType.t
+  (* "data" IDENTIFIER "=" [ "|" ] data_arm { "|" data_arm }
+     data_arm = IDENTFIER [ type] *)
+  | Data of identifier (* TODO *)
 [@@deriving show]
 
-(* Construct a human-readable representation of an expression that shows just
-   token kinds in a simple tree structure. *)
-let display_expr expr =
-  let open Printf in
-  let rec make_indent level dot =
-    if level > 0 then
-      let tab = if dot then ". " else ", " in
-      tab ^ make_indent (level - 1) (not dot)
-    else ""
-  in
-  let rec display_expr' expr indent_level =
-    let indent = make_indent indent_level true in
-    match expr with
-    | LetBinding { identifier_token; bound_expr; body_expr; _ } ->
-        let identifier = Token.show_kind identifier_token.kind in
-        let bound = display_expr' bound_expr (indent_level + 1) in
-        let body = display_expr' body_expr (indent_level + 1) in
-        sprintf "%slet %s =\n%s\n%sin%s" indent identifier bound indent body
-    | BinaryExpr { operator_token; left_expr; right_expr } ->
-        let tok = Token.show_kind operator_token.kind in
-        let left = display_expr' left_expr (indent_level + 1) in
-        let right = display_expr' right_expr (indent_level + 1) in
-        sprintf "%s%s\n%s\n%s" indent tok left right
-    | UnaryExpr { operator_token; expr } ->
-        let tok = Token.show_kind operator_token.kind in
-        let expr = display_expr' expr (indent_level + 1) in
-        sprintf "%s%s\n%s" indent tok expr
-    | Group { expr; _ } ->
-        let expr = display_expr' expr (indent_level + 1) in
-        sprintf "%sgroup\n%s" indent expr
-    | Primary tok -> indent ^ Token.show_kind tok.kind
-  in
-  display_expr' expr 0
+type top_level = { position : Position.t; kind : top_level_kind }
+[@@deriving show]
