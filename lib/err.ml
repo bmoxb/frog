@@ -1,20 +1,26 @@
-type lexical = { character : char; line_number : int; character_number : int }
+type lexical = { character : char; position : Position.t }
 
 type syntax = { token : Token.t; msg : string }
 
 type t = UnexpectedEOF | Lexical of lexical | Syntax of syntax
 
-let display err input_filename =
-  let lineno, charno, msg =
+let display err filename source =
+  let msg, position =
     match err with
-    | UnexpectedEOF -> (0, 0, "Unexpected EOF.")
-    | Lexical { character; line_number; character_number } ->
+    | UnexpectedEOF -> ("Unexpected EOF.", None)
+    | Lexical { character; position } ->
         let msg =
           Printf.sprintf "Lexical error: Expected character '%c' in input."
             character
         in
-        (line_number, character_number, msg)
-    | Syntax { token; msg } ->
-        (token.line_number, token.character_number, "Syntax error: " ^ msg)
+        (msg, Some position)
+    | Syntax { token; msg } -> ("Syntax error: " ^ msg, Some token.position)
   in
-  Printf.sprintf "> %s:%d:%d\n%s" input_filename lineno charno msg
+  let position_text =
+    position
+    |> Option.map (Position.determine_specific_position source)
+    |> Option.map (fun (p : Position.specific) ->
+           Printf.sprintf "%d:%d:" p.start_line_number p.start_character_number)
+    |> Option.value ~default:""
+  in
+  Printf.sprintf "> %s:%s\n%s" filename position_text msg

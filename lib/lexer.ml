@@ -1,11 +1,6 @@
-type t = {
-  input : string;
-  index : int;
-  line_number : int;
-  character_number : int;
-}
+type t = { input : string; position : Position.t }
 
-let init input = { input; index = 0; line_number = 1; character_number = 0 }
+let init input = { input; position = { start_offset = 0; end_offset = 0 } }
 
 let is_identifier = function
   | 'a' .. 'z' | 'A' .. 'Z' | '0' .. '9' | '_' -> true
@@ -28,33 +23,22 @@ let char_to_buf c =
 (* Get the next character in the input stream without incrementing the current
    position in the stream. *)
 let peek lexer =
-  if lexer.index < String.length lexer.input then Some lexer.input.[lexer.index]
+  if lexer.position.end_offset < String.length lexer.input then
+    Some lexer.input.[lexer.position.end_offset]
   else None
 
-(* Increment the current position in the input stream and update the current
-   line and character numbers. *)
+(* Increment the current position in the input stream. *)
 let advance lexer =
-  match peek lexer with
-  | Some peeked ->
-      let line_number, character_number =
-        match peeked with
-        | '\n' -> (lexer.line_number + 1, 0)
-        | '\t' -> (lexer.line_number, lexer.character_number + 4)
-        | _ -> (lexer.line_number, lexer.character_number + 1)
-      in
-      { lexer with index = lexer.index + 1; line_number; character_number }
-  | None -> lexer
+  {
+    lexer with
+    position =
+      { lexer.position with end_offset = lexer.position.end_offset + 1 };
+  }
 
 let conditionally_advance cond ~if_match ~otherwise lexer =
   match peek lexer with
   | Some peeked when cond peeked -> (advance lexer, Ok if_match)
   | _ -> (lexer, Ok otherwise)
-
-(* Advance until the first non-whitespace character is found (or EOF). *)
-let rec skip_whitespace lexer =
-  match peek lexer with
-  | Some peeked when is_whitespace peeked -> lexer |> advance |> skip_whitespace
-  | _ -> lexer
 
 let rec handle_string lexeme_buf lexer =
   match peek lexer with
@@ -87,70 +71,67 @@ let rec handle_identifier lexeme_buf lexer =
       let lexeme = Buffer.contents lexeme_buf in
       (lexer, Ok (Token.lookup_identifier_or_keyword lexeme))
 
-let make_token kind lexer : Token.t =
-  {
-    kind;
-    line_number = lexer.line_number;
-    character_number = lexer.character_number;
-  }
+let next_token_kind c lexer =
+  let open Token in
+  let lexer = advance lexer in
+  match c with
+  | '(' -> (lexer, Ok OpenBracket)
+  | ')' -> (lexer, Ok CloseBracket)
+  | '{' -> (lexer, Ok OpenCurly)
+  | '}' -> (lexer, Ok CloseCurly)
+  | '+' -> (lexer, Ok Plus)
+  | '-' ->
+      conditionally_advance
+        (fun c -> c = '>')
+        ~if_match:Arrow ~otherwise:Minus lexer
+  | '*' -> (lexer, Ok Star)
+  | '/' -> (lexer, Ok Slash)
+  | '=' ->
+      conditionally_advance
+        (fun c -> c = '=')
+        ~if_match:Equiv ~otherwise:Equals lexer
+  | ':' -> (lexer, Ok Colon)
+  | ';' -> (lexer, Ok Semicolon)
+  | '.' -> (lexer, Ok Dot)
+  | ',' -> (lexer, Ok Comma)
+  | '!' ->
+      conditionally_advance
+        (fun c -> c = '=')
+        ~if_match:NotEquiv ~otherwise:Exclamation lexer
+  | '>' ->
+      conditionally_advance
+        (fun c -> c = '=')
+        ~if_match:GreaterThanOrEqual ~otherwise:GreaterThan lexer
+  | '<' ->
+      conditionally_advance
+        (fun c -> c = '=')
+        ~if_match:LessThanOrEqual ~otherwise:LessThan lexer
+  | '"' -> handle_string (new_buf ()) lexer
+  | c when is_digit c -> handle_number (char_to_buf c) lexer
+  | c when is_identifier c -> handle_identifier (char_to_buf c) lexer
+  | _ ->
+      (lexer, Error (Err.Lexical { character = c; position = lexer.position }))
+
+(* Advance until the first non-whitespace character is found (or EOF). *)
+let rec skip_whitespace lexer =
+  match peek lexer with
+  | Some peeked when is_whitespace peeked -> lexer |> advance |> skip_whitespace
+  | _ -> lexer
+
+(* Set the lexer's internal start position to the end position value. *)
+let reset_start_position lexer =
+  let offset = lexer.position.end_offset in
+  { lexer with position = { start_offset = offset; end_offset = offset } }
 
 let next_token lexer =
-  let lexer = skip_whitespace lexer in
+  let lexer = lexer |> skip_whitespace |> reset_start_position in
   match peek lexer with
-  | None -> (lexer, None) (* EOF *)
   | Some c ->
-      let open Token in
-      let lexer = advance lexer in
-      let lexer, token_kind_result =
-        match c with
-        | '(' -> (lexer, Ok OpenBracket)
-        | ')' -> (lexer, Ok CloseBracket)
-        | '{' -> (lexer, Ok OpenCurly)
-        | '}' -> (lexer, Ok CloseCurly)
-        | '+' -> (lexer, Ok Plus)
-        | '-' ->
-            conditionally_advance
-              (fun c -> c = '>')
-              ~if_match:Arrow ~otherwise:Minus lexer
-        | '*' -> (lexer, Ok Star)
-        | '/' -> (lexer, Ok Slash)
-        | '=' ->
-            conditionally_advance
-              (fun c -> c = '=')
-              ~if_match:Equiv ~otherwise:Equals lexer
-        | ':' -> (lexer, Ok Colon)
-        | ';' -> (lexer, Ok Semicolon)
-        | '.' -> (lexer, Ok Dot)
-        | ',' -> (lexer, Ok Comma)
-        | '!' ->
-            conditionally_advance
-              (fun c -> c = '=')
-              ~if_match:NotEquiv ~otherwise:Exclamation lexer
-        | '>' ->
-            conditionally_advance
-              (fun c -> c = '=')
-              ~if_match:GreaterThanOrEqual ~otherwise:GreaterThan lexer
-        | '<' ->
-            conditionally_advance
-              (fun c -> c = '=')
-              ~if_match:LessThanOrEqual ~otherwise:LessThan lexer
-        | '"' -> handle_string (new_buf ()) lexer
-        | c when is_digit c -> handle_number (char_to_buf c) lexer
-        | c when is_identifier c -> handle_identifier (char_to_buf c) lexer
-        | _ ->
-            let lexical_error =
-              Err.Lexical
-                {
-                  character = c;
-                  line_number = lexer.line_number;
-                  character_number = lexer.character_number;
-                }
-            in
-            (lexer, Error lexical_error)
-      in
+      let lexer, kind_result = next_token_kind c lexer in
       let token_result =
-        match token_kind_result with
-        | Ok token_kind -> Ok (make_token token_kind lexer)
-        | Error err -> Error err
+        Result.map
+          (fun kind : Token.t -> { kind; position = lexer.position })
+          kind_result
       in
       (lexer, Some token_result)
+  | None -> (lexer, None)
