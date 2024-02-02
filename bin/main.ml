@@ -2,9 +2,9 @@ open Osaka
 
 let rec consume_tokens lexer line =
   match Lexer.next_token lexer with
-  | Some (Ok (lexer, tok)) -> tok :: consume_tokens lexer line
-  | Some (Error err) ->
-      print_endline (Err.display err "repl" line);
+  | lexer, Some (Ok tok) -> tok :: consume_tokens lexer line
+  | _, Some (Error err) ->
+      print_endline (Err.display "repl" line err);
       []
   | _ -> []
 
@@ -19,7 +19,7 @@ let rec repl () =
   let msg =
     match Parser.parse_expr parser with
     | _, Some (Ok expr) -> Ast.display_expr expr
-    | _, Some (Error err) -> Err.display err "repl" line
+    | _, Some (Error err) -> Err.display "repl" line err
     | _, None -> "invalid expr"
   in
   print_endline (msg ^ "\n");

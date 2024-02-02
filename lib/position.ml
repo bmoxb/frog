@@ -9,27 +9,38 @@ type specific = {
   start_character_number : int;
   end_line_number : int;
   end_character_number : int;
+  start_block_offset : int;
+  end_block_offset : int;
 }
 [@@deriving show]
 
-let determine_specific_position source offsets =
-  let rec find_line_char target_index ~index ~line ~char =
-    if target_index == index then (line, char)
+let determine_specific_position source_code position =
+  (* Find the line number and character number of the given offset. *)
+  let rec find_line_char target_offset ~offset ~line ~char =
+    if target_offset == offset then (line, char)
     else
       let new_line, new_char =
-        match source.[index] with
+        match source_code.[offset] with
         | '\n' -> (line + 1, 0)
         | '\t' -> (line, char + 4)
         | _ -> (line, char + 1)
       in
-      find_line_char target_index ~index:(index + 1) ~line:new_line
+      find_line_char target_offset ~offset:(offset + 1) ~line:new_line
         ~char:new_char
   in
+  let rec find_line_start_or_end offset update_offset =
+    if
+      offset < 0
+      || offset >= String.length source_code
+      || source_code.[offset] == '\n'
+    then offset
+    else find_line_start_or_end (update_offset offset) update_offset
+  in
   let start_line_number, start_character_number =
-    find_line_char offsets.start_offset ~index:0 ~line:1 ~char:0
+    find_line_char position.start_offset ~offset:0 ~line:1 ~char:0
   in
   let end_line_number, end_character_number =
-    find_line_char offsets.end_offset ~index:offsets.start_offset
+    find_line_char position.end_offset ~offset:position.start_offset
       ~line:start_line_number ~char:start_character_number
   in
   {
@@ -37,4 +48,7 @@ let determine_specific_position source offsets =
     start_character_number;
     end_line_number;
     end_character_number;
+    start_block_offset =
+      find_line_start_or_end position.start_offset (fun n -> n - 1) + 1;
+    end_block_offset = find_line_start_or_end position.end_offset (( + ) 1);
   }
