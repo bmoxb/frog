@@ -63,6 +63,21 @@ module Expr = struct
     | Divide
   [@@deriving show]
 
+  let token_kind_to_binary_operator = function
+    | Token.AndKeyword -> Some And
+    | Token.OrKeyword -> Some Or
+    | Token.Equiv -> Some Equiv
+    | Token.NotEquiv -> Some NotEquiv
+    | Token.GreaterThan -> Some GreaterThan
+    | Token.LessThan -> Some LessThan
+    | Token.GreaterThanOrEqual -> Some GreaterThanOrEqual
+    | Token.LessThanOrEqual -> Some LessThanOrEqual
+    | Token.Plus -> Some Add
+    | Token.Minus -> Some Subtract
+    | Token.Star -> Some Multiply
+    | Token.Slash -> Some Divide
+    | _ -> None
+
   let display_binary_operator = function
     | And -> "and"
     | Or -> "or"
@@ -79,13 +94,32 @@ module Expr = struct
 
   type unary_operator = Not | Negate [@@deriving show]
 
+  let token_kind_to_unary_operator = function
+    | Token.NotKeyword -> Some Not
+    | Token.Minus -> Some Negate
+    | _ -> None
+
   let display_unary_operator = function Not -> "not" | Negate -> "-"
+
+  type primary_kind = NumberLiteral | StringLiteral | Identifier
+  [@@deriving show]
+
+  let token_kind_to_primary_kind = function
+    | Token.NumberLiteral _ -> Some NumberLiteral
+    | Token.StringLiteral _ -> Some StringLiteral
+    | Token.Identifier _ -> Some Identifier
+    | _ -> None
+
+  let display_primary_kind = function
+    | NumberLiteral -> "number literal"
+    | StringLiteral -> "string literal"
+    | Identifier -> "identifier"
 
   type t = { position : Position.t; kind : kind } [@@deriving show]
 
   and kind =
     (* "let" pattern "=" expr "in" expr *)
-    | LetIn of Pattern.t * DataType.t * t
+    | LetIn of Pattern.t * DataType.t * t * t
     (* "match" expr "with" [ "|" ] match_arm { "|" match_arm }
        match_arm = pattern "->" expr *)
     | Match of t * (Pattern.t * t) list
@@ -97,18 +131,19 @@ module Expr = struct
     | UnaryOp of unary_operator * t
     (* "(" expr ")" *)
     | Grouping of t
-    | Identifier of identifier
+    | Primary of primary_kind * string
   [@@deriving show]
 
   let rec to_graph expr : Graph.t =
     let label, (edges : Graph.edge list) =
       match expr.kind with
-      | LetIn (pattern, data_type, expr) ->
+      | LetIn (pattern, data_type, bound_expr, body_expr) ->
           ( "let",
             [
               { edge_label = "pattern"; vertex = Pattern.to_graph pattern };
               { edge_label = "type"; vertex = DataType.to_graph data_type };
-              { edge_label = "in"; vertex = to_graph expr };
+              { edge_label = "bound expr"; vertex = to_graph bound_expr };
+              { edge_label = "in"; vertex = to_graph body_expr };
             ] )
       | Match (expr, arms) ->
           let arm_to_graph index (pattern, expr) =
@@ -157,9 +192,14 @@ module Expr = struct
             ] )
       | Grouping expr ->
           ("grouping", [ { edge_label = "expr"; vertex = to_graph expr } ])
-      | Identifier identifier ->
-          ( "identifier",
-            [ Graph.unlabelled_edge (Graph.leaf identifier Graph.black) ] )
+      | Primary (kind, value) ->
+          ( "primary",
+            [
+              {
+                edge_label = display_primary_kind kind;
+                vertex = Graph.leaf value Graph.black;
+              };
+            ] )
     in
     { vertex_label = label; colour = { r = 0.1; g = 0.1; b = 1.0 }; edges }
 end

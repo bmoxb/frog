@@ -18,7 +18,7 @@ let rec repl () =
   let parser = Parser.init tokens in
   let msg =
     match Parser.parse_expr parser with
-    | _, Some (Ok expr) -> Ast.display_expr expr
+    | _, Some (Ok expr) -> Ast.Expr.show expr
     | _, Some (Error err) -> Err.display "repl" line err
     | _, None -> "invalid expr"
   in
