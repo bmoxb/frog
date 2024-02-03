@@ -40,4 +40,4 @@ let to_dot root =
     (next_number, vertex_line :: List.flatten nested_child_lines)
   in
   let _, lines = traverse 0 root in
-  "graph {\n" ^ String.concat "\n" lines ^ "}"
+  "graph {\nnodesep = 1.0;\nranksep=1.0;\n" ^ String.concat "\n" lines ^ "\n}"
