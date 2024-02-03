@@ -1,23 +1,50 @@
 type identifier = string [@@deriving show]
 
 module Pattern = struct
-  (* TODO *)
-  type t = Identifier of identifier [@@deriving show]
+  type t = Identifier of identifier | List of t list | Cons of t * t
+  [@@deriving show]
 
-  let to_graph pattern : Graph.t =
-    match pattern with
-    | Identifier identifier ->
-        Graph.leaf identifier { r = 1.0; g = 0.75; b = 0.8 }
+  let rec to_graph pattern : Graph.t =
+    let label, edges =
+      match pattern with
+      | Identifier identifier ->
+          ( "identifier",
+            [ Graph.unlabelled_edge (Graph.leaf identifier Graph.black) ] )
+      | List patterns ->
+          if List.is_empty patterns then ("empty list", [])
+          else
+            ( "list",
+              List.mapi
+                (fun index pattern : Graph.edge ->
+                  {
+                    edge_label = string_of_int index;
+                    vertex = to_graph pattern;
+                  })
+                patterns )
+      | Cons (head, tail) ->
+          ( "cons",
+            [
+              { edge_label = "head"; vertex = to_graph head };
+              { edge_label = "tail"; vertex = to_graph tail };
+            ] )
+    in
+    { vertex_label = label; colour = { r = 1.0; g = 0.75; b = 0.8 }; edges }
 end
 
 module DataType = struct
-  (* TODO *)
-  type t = Identifier of identifier [@@deriving show]
+  type t = Identifier of identifier | List of t [@@deriving show]
 
-  let to_graph data_type : Graph.t =
-    match data_type with
-    | Identifier identifier ->
-        Graph.leaf identifier { r = 1.0; g = 0.1; b = 0.1 }
+  let rec to_graph data_type : Graph.t =
+    let label, edges =
+      match data_type with
+      | Identifier identifier ->
+          ( "identifier",
+            [ Graph.unlabelled_edge (Graph.leaf identifier Graph.black) ] )
+      | List data_type ->
+          ( "list",
+            [ { edge_label = "element type"; vertex = to_graph data_type } ] )
+    in
+    { vertex_label = label; colour = { r = 1.0; g = 0.1; b = 0.1 }; edges }
 end
 
 module Expr = struct
