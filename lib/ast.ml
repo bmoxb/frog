@@ -86,7 +86,9 @@ module Expr = struct
   and kind =
     (* "let" pattern "=" expr "in" expr *)
     | LetIn of Pattern.t * DataType.t * t
-    (*| Match of t*)
+    (* "match" expr "with" [ "|" ] match_arm { "|" match_arm }
+       match_arm = pattern "->" expr *)
+    | Match of t * (Pattern.t * t) list
     (* "if" expr "then" expr "else" expr *)
     | IfThenElse of t * t * t
     (* expr binary_operator expr *)
@@ -108,6 +110,25 @@ module Expr = struct
               { edge_label = "type"; vertex = DataType.to_graph data_type };
               { edge_label = "in"; vertex = to_graph expr };
             ] )
+      | Match (expr, arms) ->
+          let arm_to_graph index (pattern, expr) =
+            Graph.unlabelled_edge
+              {
+                vertex_label = Printf.sprintf "arm %d" index;
+                colour = Graph.black;
+                edges =
+                  [
+                    {
+                      edge_label = "pattern";
+                      vertex = Pattern.to_graph pattern;
+                    };
+                    { edge_label = "expr"; vertex = to_graph expr };
+                  ];
+              }
+          in
+          ( "match",
+            { edge_label = "expr"; vertex = to_graph expr }
+            :: List.mapi arm_to_graph arms )
       | IfThenElse (condition, then_expr, else_expr) ->
           ( "if",
             [
