@@ -1,10 +1,12 @@
-type colour = Black | Blue | Pink | Red
+type colour = { r : float; g : float; b : float }
 
-let display_colour = function
-  | Black -> "black"
-  | Blue -> "blue"
-  | Pink -> "pink"
-  | Red -> "red"
+let black = { r = 0.0; g = 0.0; b = 0.0 }
+
+let hex_of_colour { r; g; b } =
+  Printf.sprintf "\"#%.2X%.2X%.2X\""
+    (int_of_float (255.0 *. r))
+    (int_of_float (255.0 *. g))
+    (int_of_float (255.0 *. b))
 
 type t = { vertex_label : string; colour : colour; edges : edge list }
 
@@ -20,7 +22,7 @@ let to_dot root =
     let vertex_line =
       sprintf "%d [label=\"%s\",shape=box,color=%s];" parent_number
         vertex.vertex_label
-        (display_colour vertex.colour)
+        (hex_of_colour vertex.colour)
     in
     let edge_to_lines child_number edge =
       (* Line connecting vertex of parent_number to this edge vertex. *)
