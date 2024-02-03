@@ -32,18 +32,15 @@ let test_valid_keyword_tokens = test_valid_tokens "keyword"
 
 let test_valid_identifier_tokens inputs =
   test_valid_tokens "identifier"
-    (List.map (fun s -> (s, Token.Identifier s)) inputs)
+    (List.map (fun s -> (s, Token.Identifier)) inputs)
 
 let test_valid_string_literal_tokens inputs =
-  let input_to_pair s =
-    let quotes_removed = String.sub s 1 (String.length s - 2) in
-    (s, Token.StringLiteral quotes_removed)
-  in
+  let input_to_pair s = (s, Token.StringLiteral) in
   test_valid_tokens "string literal" (List.map input_to_pair inputs)
 
 let test_valid_number_literal_tokens inputs =
   test_valid_tokens "number literal"
-    (List.map (fun s -> (s, Token.NumberLiteral s)) inputs)
+    (List.map (fun s -> (s, Token.NumberLiteral)) inputs)
 
 let test_valid_token_stream name input expected_tokens =
   name >:: fun _ ->
@@ -123,11 +120,11 @@ let tests =
                  position = { start_offset = 0; end_offset = 1 };
                };
                {
-                 kind = Token.NumberLiteral "5";
+                 kind = Token.NumberLiteral;
                  position = { start_offset = 1; end_offset = 2 };
                };
                {
-                 kind = Token.NumberLiteral "5.";
+                 kind = Token.NumberLiteral;
                  position = { start_offset = 3; end_offset = 5 };
                };
              ];
@@ -135,11 +132,11 @@ let tests =
              "\"abc\"\"def\nghi\""
              [
                {
-                 kind = Token.StringLiteral "abc";
+                 kind = Token.StringLiteral;
                  position = { start_offset = 0; end_offset = 5 };
                };
                {
-                 kind = Token.StringLiteral "def\nghi";
+                 kind = Token.StringLiteral;
                  position = { start_offset = 5; end_offset = 14 };
                };
              ];

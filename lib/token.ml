@@ -21,7 +21,7 @@ type kind =
   | GreaterThanOrEqual (* >= *)
   | LessThanOrEqual (* <= *)
   (* Identifiers / Keywords *)
-  | Identifier of string
+  | Identifier
   | NotKeyword
   | AndKeyword
   | OrKeyword
@@ -31,12 +31,11 @@ type kind =
   | LetKeyword
   | InKeyword
   (* Literals *)
-  | StringLiteral of string
-  | NumberLiteral of string
+  | StringLiteral
+  | NumberLiteral
 [@@deriving show]
 
-(* Represents a single token of some token kind and at some position within a
-   source file. *)
+(* Represents a single token within a source file. *)
 type t = { kind : kind; position : Position.t } [@@deriving show]
 
 (* Match a lexeme to either a keyword token kind or, if not a known keyword, an
@@ -51,4 +50,4 @@ let lookup_identifier_or_keyword lexeme =
   | "else" -> ElseKeyword
   | "let" -> LetKeyword
   | "in" -> InKeyword
-  | _ -> Identifier lexeme
+  | _ -> Identifier

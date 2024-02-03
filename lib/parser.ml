@@ -1,6 +1,6 @@
-type t = { tokens : Token.t list }
+type t = { source_code : string; tokens : Token.t list }
 
-let init tokens = { tokens }
+let init source_code tokens = { source_code; tokens }
 
 (* Exception used to conveniently send syntax errors up the call stack. Must not
    leak to the module's public interface. *)
@@ -18,7 +18,7 @@ let peek_kind parser =
    one. *)
 let advance parser =
   match parser.tokens with
-  | token :: tail -> ({ tokens = tail }, token)
+  | token :: tail -> ({ parser with tokens = tail }, token)
   | [] -> raise_notrace (ErrException Err.UnexpectedEOF)
 
 (* If the next token has the given token kind, advance the current position.
@@ -44,33 +44,34 @@ and expr parser =
 and let_binding parser : t * Ast.Expr.t =
   let open Token in
   let parser, let_token = advance parser in
-  (* TODO: Pattern instead of identifier.
-     Also, storing lexeme in token rather than in kind would remove the need for match *)
-  match advance parser with
-  | parser, { kind = Identifier identifier; _ } ->
-      let parser, _ = expect_kind Equals "Expected '=' token." parser in
-      let parser, bound_expr = expr parser in
-      let parser, _ = expect_kind InKeyword "Expected 'in' keyword." parser in
-      let parser, body_expr = expr parser in
-      let ast_node : Ast.Expr.t =
+  (* TODO: Pattern instead of identifier. *)
+  let parser, identifier_token =
+    expect_kind Identifier "Expected an identifier to bind an expression to."
+      parser
+  in
+  let identifier =
+    Position.substring parser.source_code identifier_token.position
+  in
+  let parser, _ = expect_kind Equals "Expected '=' token." parser in
+  let parser, bound_expr = expr parser in
+  let parser, _ = expect_kind InKeyword "Expected 'in' keyword." parser in
+  let parser, body_expr = expr parser in
+  let ast_node : Ast.Expr.t =
+    {
+      position =
         {
-          position =
-            {
-              start_offset = let_token.position.start_offset;
-              end_offset = body_expr.position.end_offset;
-            };
-          kind =
-            Ast.Expr.LetIn
-              ( Ast.Pattern.Identifier identifier,
-                Ast.DataType.Identifier "temp",
-                bound_expr,
-                body_expr );
-        }
-      in
-      (parser, ast_node)
-  | _, token ->
-      raise_syntax_error token
-        "Expected an identifier to bind an expression to."
+          start_offset = let_token.position.start_offset;
+          end_offset = body_expr.position.end_offset;
+        };
+      kind =
+        Ast.Expr.LetIn
+          ( Ast.Pattern.Identifier identifier,
+            Ast.DataType.Identifier "temp",
+            bound_expr,
+            body_expr );
+    }
+  in
+  (parser, ast_node)
 
 and logical parser =
   let open Ast.Expr in
@@ -125,8 +126,9 @@ and primary parser =
   match Option.bind (peek_kind parser) Ast.Expr.token_kind_to_primary_kind with
   | Some kind ->
       let parser, token = advance parser in
+      let lexeme = Position.substring parser.source_code token.position in
       let node : Ast.Expr.t =
-        { position = token.position; kind = Ast.Expr.Primary (kind, "TODO") }
+        { position = token.position; kind = Ast.Expr.Primary (kind, lexeme) }
       in
       (parser, node)
   | _ -> grouping parser

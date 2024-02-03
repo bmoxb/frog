@@ -105,9 +105,9 @@ module Expr = struct
   [@@deriving show]
 
   let token_kind_to_primary_kind = function
-    | Token.NumberLiteral _ -> Some NumberLiteral
-    | Token.StringLiteral _ -> Some StringLiteral
-    | Token.Identifier _ -> Some Identifier
+    | Token.NumberLiteral -> Some NumberLiteral
+    | Token.StringLiteral -> Some StringLiteral
+    | Token.Identifier -> Some Identifier
     | _ -> None
 
   let display_primary_kind = function

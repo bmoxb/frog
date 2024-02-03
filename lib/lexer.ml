@@ -1,6 +1,7 @@
-type t = { input : string; position : Position.t }
+type t = { source_code : string; position : Position.t }
 
-let init input = { input; position = { start_offset = 0; end_offset = 0 } }
+let init source_code =
+  { source_code; position = { start_offset = 0; end_offset = 0 } }
 
 let is_identifier = function
   | 'a' .. 'z' | 'A' .. 'Z' | '0' .. '9' | '_' -> true
@@ -10,21 +11,11 @@ let is_digit = function '0' .. '9' -> true | _ -> false
 
 let is_whitespace = function ' ' | '\n' | '\t' -> true | _ -> false
 
-(* Buffers are used to construct lexeme strings efficiently for identifiers and
-   literals one character at a time. This function constructs a new buffer of a
-   sensible starting capacity for that purpose. *)
-let new_buf () = Buffer.create 10
-
-let char_to_buf c =
-  let buf = new_buf () in
-  Buffer.add_char buf c;
-  buf
-
 (* Get the next character in the input stream without incrementing the current
    position in the stream. *)
 let peek lexer =
-  if lexer.position.end_offset < String.length lexer.input then
-    Some lexer.input.[lexer.position.end_offset]
+  if lexer.position.end_offset < String.length lexer.source_code then
+    Some lexer.source_code.[lexer.position.end_offset]
   else None
 
 (* Increment the current position in the input stream. *)
@@ -40,35 +31,26 @@ let conditionally_advance cond ~if_match ~otherwise lexer =
   | Some peeked when cond peeked -> (advance lexer, Ok if_match)
   | _ -> (lexer, Ok otherwise)
 
-let rec handle_string lexeme_buf lexer =
+let rec handle_string lexer =
   match peek lexer with
-  | Some '"' ->
-      let lexeme = Buffer.contents lexeme_buf in
-      (advance lexer, Ok (Token.StringLiteral lexeme))
-  | Some peeked ->
-      Buffer.add_char lexeme_buf peeked;
-      lexer |> advance |> handle_string lexeme_buf
+  | Some '"' -> (advance lexer, Ok Token.StringLiteral)
+  | Some _ -> lexer |> advance |> handle_string
   | None -> (lexer, Error Err.UnexpectedEOF)
 
-let rec handle_number ?(is_decimal = false) lexeme_buf lexer =
+let rec handle_number ?(is_decimal = false) lexer =
   match peek lexer with
   | Some peeked when is_digit peeked ->
-      Buffer.add_char lexeme_buf peeked;
-      lexer |> advance |> handle_number ~is_decimal lexeme_buf
+      lexer |> advance |> handle_number ~is_decimal
   | Some '.' when not is_decimal ->
-      Buffer.add_char lexeme_buf '.';
-      lexer |> advance |> handle_number ~is_decimal:true lexeme_buf
-  | _ ->
-      let lexeme = Buffer.contents lexeme_buf in
-      (lexer, Ok (Token.NumberLiteral lexeme))
+      lexer |> advance |> handle_number ~is_decimal:true
+  | _ -> (lexer, Ok Token.NumberLiteral)
 
-let rec handle_identifier lexeme_buf lexer =
+let rec handle_identifier lexer =
   match peek lexer with
   | Some peeked when is_identifier peeked ->
-      Buffer.add_char lexeme_buf peeked;
-      lexer |> advance |> handle_identifier lexeme_buf
+      lexer |> advance |> handle_identifier
   | _ ->
-      let lexeme = Buffer.contents lexeme_buf in
+      let lexeme = Position.substring lexer.source_code lexer.position in
       (lexer, Ok (Token.lookup_identifier_or_keyword lexeme))
 
 let next_token_kind c lexer =
@@ -106,9 +88,9 @@ let next_token_kind c lexer =
       conditionally_advance
         (fun c -> c = '=')
         ~if_match:LessThanOrEqual ~otherwise:LessThan lexer
-  | '"' -> handle_string (new_buf ()) lexer
-  | c when is_digit c -> handle_number (char_to_buf c) lexer
-  | c when is_identifier c -> handle_identifier (char_to_buf c) lexer
+  | '"' -> handle_string lexer
+  | c when is_digit c -> handle_number lexer
+  | c when is_identifier c -> handle_identifier lexer
   | _ ->
       (lexer, Error (Err.Lexical { character = c; position = lexer.position }))
 

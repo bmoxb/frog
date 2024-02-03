@@ -15,7 +15,7 @@ let rec repl () =
   let tokens = consume_tokens lexer line in
   List.iter (fun token -> print_endline (Token.show token)) tokens;
   print_endline "Expression:";
-  let parser = Parser.init tokens in
+  let parser = Parser.init line tokens in
   let msg =
     match Parser.parse_expr parser with
     | _, Some (Ok expr) -> Ast.Expr.show expr

@@ -3,6 +3,10 @@
    giving useful error messages later. *)
 type t = { start_offset : int; end_offset : int } [@@deriving show]
 
+let substring s position =
+  String.sub s position.start_offset
+    (position.end_offset - position.start_offset)
+
 (* Represents a human-readable position in a source file. *)
 type specific = {
   start_line_number : int;
