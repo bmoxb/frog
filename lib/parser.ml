@@ -37,96 +37,139 @@ let rec parse_expr parser =
     with ErrException err -> (parser, Some (Error err))
 
 and expr parser =
-  let open Token in
-  let let_binding parser =
-    let parser, let_token = advance parser in
-    match advance parser with
-    | parser, ({ kind = Identifier _; _ } as identifier_token) ->
-        let parser, equals_token =
-          expect_kind Equals "Expected '=' token." parser
-        in
-        let parser, bound_expr = expr parser in
-        let parser, in_token =
-          expect_kind InKeyword "Expected 'in' keyword." parser
-        in
-        let parser, body_expr = expr parser in
-        let ast_node =
-          Ast.LetBinding
-            {
-              let_token;
-              identifier_token;
-              equals_token;
-              bound_expr;
-              in_token;
-              body_expr;
-            }
-        in
-        (parser, ast_node)
-    | _, token ->
-        raise_syntax_error token
-          "Expected an identifier to bind an expression to."
-  in
   match peek_kind parser with
   | Some LetKeyword -> let_binding parser
   | _ -> logical parser
 
-and logical parser =
+and let_binding parser : t * Ast.Expr.t =
   let open Token in
-  let is_op = function AndKeyword | OrKeyword -> true | _ -> false in
-  left_associative_binary_expr parser equality is_op
+  let parser, let_token = advance parser in
+  (* TODO: Pattern instead of identifier.
+     Also, storing lexeme in token rather than in kind would remove the need for match *)
+  match advance parser with
+  | parser, { kind = Identifier identifier; _ } ->
+      let parser, _ = expect_kind Equals "Expected '=' token." parser in
+      let parser, bound_expr = expr parser in
+      let parser, _ = expect_kind InKeyword "Expected 'in' keyword." parser in
+      let parser, body_expr = expr parser in
+      let ast_node : Ast.Expr.t =
+        {
+          position =
+            {
+              start_offset = let_token.position.start_offset;
+              end_offset = body_expr.position.end_offset;
+            };
+          kind =
+            Ast.Expr.LetIn
+              ( Ast.Pattern.Identifier identifier,
+                Ast.DataType.Identifier "temp",
+                bound_expr,
+                body_expr );
+        }
+      in
+      (parser, ast_node)
+  | _, token ->
+      raise_syntax_error token
+        "Expected an identifier to bind an expression to."
+
+and logical parser =
+  let open Ast.Expr in
+  let is_wanted_op = function And | Or -> true | _ -> false in
+  left_associative_binary_expr parser equality is_wanted_op
 
 and equality parser =
-  let is_op = function Token.Equiv | Token.NotEquiv -> true | _ -> false in
-  left_associative_binary_expr parser comparison is_op
+  let open Ast.Expr in
+  let is_wanted_op = function Equiv | NotEquiv -> true | _ -> false in
+  left_associative_binary_expr parser comparison is_wanted_op
 
 and comparison parser =
-  let open Token in
-  let is_op = function
+  let open Ast.Expr in
+  let is_wanted_op = function
     | GreaterThan | LessThan | GreaterThanOrEqual | LessThanOrEqual -> true
     | _ -> false
   in
-  left_associative_binary_expr parser term is_op
+  left_associative_binary_expr parser term is_wanted_op
 
 and term parser =
-  let is_op = function Token.Minus | Token.Plus -> true | _ -> false in
-  left_associative_binary_expr parser factor is_op
+  let open Ast.Expr in
+  let is_wanted_op = function Add | Subtract -> true | _ -> false in
+  left_associative_binary_expr parser factor is_wanted_op
 
 and factor parser =
-  let is_op = function Token.Star | Token.Slash -> true | _ -> false in
-  left_associative_binary_expr parser unary is_op
+  let open Ast.Expr in
+  let is_wanted_op = function Multiply | Divide -> true | _ -> false in
+  left_associative_binary_expr parser unary is_wanted_op
 
 and unary parser =
-  match peek_kind parser with
-  | Some Token.NotKeyword | Some Token.Minus ->
-      let parser, operator_token = advance parser in
+  match
+    Option.bind (peek_kind parser) Ast.Expr.token_kind_to_unary_operator
+  with
+  | Some op ->
+      let parser, op_token = advance parser in
       let parser, expr = unary parser in
-      (parser, Ast.UnaryExpr { operator_token; expr })
-  | _ -> primary parser
+      let node : Ast.Expr.t =
+        {
+          position =
+            {
+              start_offset = op_token.position.start_offset;
+              end_offset = expr.position.end_offset;
+            };
+          kind = Ast.Expr.UnaryOp (op, expr);
+        }
+      in
+      (parser, node)
+  | None -> primary parser
 
 and primary parser =
   let open Token in
-  match peek_kind parser with
-  | Some (NumberLiteral _) | Some (StringLiteral _) | Some (Identifier _) ->
+  match Option.bind (peek_kind parser) Ast.Expr.token_kind_to_primary_kind with
+  | Some kind ->
       let parser, token = advance parser in
-      (parser, Ast.Primary token)
-  | Some OpenBracket ->
-      let parser, open_bracket_token = advance parser in
+      let node : Ast.Expr.t =
+        { position = token.position; kind = Ast.Expr.Primary (kind, "TODO") }
+      in
+      (parser, node)
+  | _ -> grouping parser
+
+and grouping parser =
+  let parser, token = advance parser in
+  match token.kind with
+  | OpenBracket ->
       let parser, expr = expr parser in
-      let parser, close_bracket_token =
+      let parser, close_token =
         expect_kind CloseBracket "Expected closing ')' token." parser
       in
-      (parser, Ast.Group { open_bracket_token; expr; close_bracket_token })
-  | _ ->
-      let _, token = advance parser in
-      raise_syntax_error token "Expected primary expression."
-
-and left_associative_binary_expr parser child_expr is_op =
-  let parser, left_expr = child_expr parser in
-  match peek_kind parser with
-  | Some kind when is_op kind ->
-      let parser, operator_token = advance parser in
-      let parser, right_expr =
-        left_associative_binary_expr parser child_expr is_op
+      let node : Ast.Expr.t =
+        {
+          position =
+            {
+              start_offset = token.position.start_offset;
+              end_offset = close_token.position.end_offset;
+            };
+          kind = Ast.Expr.Grouping expr;
+        }
       in
-      (parser, Ast.BinaryExpr { operator_token; left_expr; right_expr })
+      (parser, node)
+  | _ -> raise_syntax_error token "Expected primary expression."
+
+and left_associative_binary_expr parser child_expr is_wanted_op =
+  let parser, left_expr = child_expr parser in
+  let peeked_kind = peek_kind parser in
+  match Option.bind peeked_kind Ast.Expr.token_kind_to_binary_operator with
+  | Some op when is_wanted_op op ->
+      let parser, _ = advance parser in
+      let parser, right_expr =
+        left_associative_binary_expr parser child_expr is_wanted_op
+      in
+      let node : Ast.Expr.t =
+        {
+          position =
+            {
+              start_offset = left_expr.position.start_offset;
+              end_offset = right_expr.position.end_offset;
+            };
+          kind = Ast.Expr.BinOp (op, left_expr, right_expr);
+        }
+      in
+      (parser, node)
   | _ -> (parser, left_expr)
