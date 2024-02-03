@@ -4,16 +4,20 @@ module Pattern = struct
   (* TODO *)
   type t = Identifier of identifier [@@deriving show]
 
+  let colour = Graph.Pink
+
   let to_graph pattern : Graph.t =
-    match pattern with Identifier identifier -> Graph.leaf identifier
+    match pattern with Identifier identifier -> Graph.leaf identifier colour
 end
 
 module DataType = struct
   (* TODO *)
   type t = Identifier of identifier [@@deriving show]
 
+  let colour = Graph.Red
+
   let to_graph data_type : Graph.t =
-    match data_type with Identifier identifier -> Graph.leaf identifier
+    match data_type with Identifier identifier -> Graph.leaf identifier colour
 end
 
 module Expr = struct
@@ -67,11 +71,14 @@ module Expr = struct
     | Identifier of identifier
   [@@deriving show]
 
+  let colour = Graph.Blue
+
   let rec to_graph expr : Graph.t =
     match expr.kind with
     | LetIn (pattern, data_type, expr) ->
         {
           vertex_label = "let";
+          colour;
           edges =
             [
               { edge_label = "pattern"; vertex = Pattern.to_graph pattern };
@@ -82,6 +89,7 @@ module Expr = struct
     | IfThenElse (condition, then_expr, else_expr) ->
         {
           vertex_label = "if";
+          colour;
           edges =
             [
               { edge_label = "condition"; vertex = to_graph condition };
@@ -92,12 +100,13 @@ module Expr = struct
     | BinOp (op, lhs, rhs) ->
         {
           vertex_label = "binary operation";
+          colour;
           edges =
             [
               { edge_label = "lhs"; vertex = to_graph lhs };
               {
                 edge_label = "op";
-                vertex = Graph.leaf (display_binary_operator op);
+                vertex = Graph.leaf (display_binary_operator op) Graph.Black;
               };
               { edge_label = "rhs"; vertex = to_graph rhs };
             ];
@@ -105,11 +114,12 @@ module Expr = struct
     | UnaryOp (op, expr) ->
         {
           vertex_label = "unary operation";
+          colour;
           edges =
             [
               {
                 edge_label = "op";
-                vertex = Graph.leaf (display_unary_operator op);
+                vertex = Graph.leaf (display_unary_operator op) Graph.Black;
               };
               { edge_label = "expr"; vertex = to_graph expr };
             ];
@@ -117,12 +127,14 @@ module Expr = struct
     | Grouping expr ->
         {
           vertex_label = "grouping";
+          colour;
           edges = [ { edge_label = "expr"; vertex = to_graph expr } ];
         }
     | Identifier identifier ->
         {
           vertex_label = "identifier";
-          edges = [ Graph.unlabelled_edge (Graph.leaf identifier) ];
+          colour;
+          edges = [ Graph.unlabelled_edge (Graph.leaf identifier Graph.Black) ];
         }
 end
 

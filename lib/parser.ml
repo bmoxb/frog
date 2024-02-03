@@ -2,6 +2,11 @@ type t = { tokens : Token.t list }
 
 let init tokens = { tokens }
 
+let parse_expr parser =
+  let _ = parser.tokens in
+  (parser, None)
+
+(*
 (* Exception used to conveniently send syntax errors up the call stack. Must not
    leak to the module's public interface. *)
 exception ErrException of Err.t
@@ -130,3 +135,4 @@ and left_associative_binary_expr parser child_expr is_op =
       in
       (parser, Ast.BinaryExpr { operator_token; left_expr; right_expr })
   | _ -> (parser, left_expr)
+*)
