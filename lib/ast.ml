@@ -193,6 +193,16 @@ module Expr = struct
       | Grouping expr ->
           ("grouping", [ { edge_label = "expr"; vertex = to_graph expr } ])
       | Primary (kind, value) ->
+          (* Need to escape quotes properly if a string literal. *)
+          let value =
+            match kind with
+            | StringLiteral ->
+                let last_quote_removed =
+                  String.sub value 0 (String.length value - 1)
+                in
+                "\\" ^ last_quote_removed ^ "\\\""
+            | _ -> value
+          in
           ( "primary",
             [
               {
