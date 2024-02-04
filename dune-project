@@ -15,7 +15,7 @@
 
 (package
  (name osaka)
- (synopsis "An imperative programming language with a novel substructural type system")
+ (synopsis "An experimental functional programming language.")
  (depends ocaml dune))
 
 ; See the complete stanza docs at https://dune.readthedocs.io/en/stable/dune-files.html#dune-project
