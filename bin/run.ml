@@ -29,7 +29,7 @@ let get_exprs source_code tokens =
 
 let debug_ast path expr =
   if path <> "" then
-    let text = expr |> Ast.Expr.to_graph |> Graph.to_dot in
+    let text = expr |> Ast.Expr.to_graph |> Tree.to_dot in
     Out_channel.with_open_text path (fun chan ->
         Out_channel.output_string chan text)
   else ()

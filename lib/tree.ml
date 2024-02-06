@@ -1,9 +1,6 @@
-(** Basic representation of trees that can be converted into Graphviz DOT
-    format. *)
-
 type colour = { r : float; g : float; b : float }
 
-let black = { r = 0.0; g = 0.0; b = 0.0 }
+let rgb r g b = { r; g; b }
 
 let hex_of_colour { r; g; b } =
   Printf.sprintf "\"#%.2X%.2X%.2X\""
@@ -11,13 +8,14 @@ let hex_of_colour { r; g; b } =
     (int_of_float (255.0 *. g))
     (int_of_float (255.0 *. b))
 
-type t = { vertex_label : string; colour : colour; edges : edge list }
+type vertex = { vertex_label : string; colour : colour; edges : edge list }
 
-and edge = { edge_label : string; vertex : t }
+and edge = { edge_label : string; vertex : vertex }
 
-let leaf label colour = { vertex_label = label; colour; edges = [] }
+let vertex ?(colour = rgb 0.0 0.0 0.0) ?(edges = []) label =
+  { vertex_label = label; colour; edges }
 
-let unlabelled_edge vertex = { edge_label = ""; vertex }
+let edge ?(label = "") vertex = { edge_label = label; vertex }
 
 let to_dot root =
   let open Printf in

@@ -6,47 +6,41 @@ module Pattern = struct
   type t = Identifier of identifier | List of t list | Cons of t * t
   [@@deriving show]
 
-  let rec to_graph pattern : Graph.t =
+  let rec to_graph pattern =
     let label, edges =
       match pattern with
       | Identifier identifier ->
-          ( "identifier",
-            [ Graph.unlabelled_edge (Graph.leaf identifier Graph.black) ] )
+          ("identifier", [ Tree.edge (Tree.vertex identifier) ])
       | List patterns ->
           if List.is_empty patterns then ("empty list", [])
           else
             ( "list",
               List.mapi
-                (fun index pattern : Graph.edge ->
-                  {
-                    edge_label = string_of_int index;
-                    vertex = to_graph pattern;
-                  })
+                (fun index pattern ->
+                  Tree.edge ~label:(string_of_int index) (to_graph pattern))
                 patterns )
       | Cons (head, tail) ->
           ( "cons",
             [
-              { edge_label = "head"; vertex = to_graph head };
-              { edge_label = "tail"; vertex = to_graph tail };
+              Tree.edge ~label:"head" (to_graph head);
+              Tree.edge ~label:"tail" (to_graph tail);
             ] )
     in
-    { vertex_label = label; colour = { r = 1.0; g = 0.75; b = 0.8 }; edges }
+    Tree.vertex ~colour:(Tree.rgb 1.0 0.75 0.8) ~edges label
 end
 
 module DataType = struct
   type t = Identifier of identifier | List of t [@@deriving show]
 
-  let rec to_graph data_type : Graph.t =
+  let rec to_graph data_type =
     let label, edges =
       match data_type with
       | Identifier identifier ->
-          ( "identifier",
-            [ Graph.unlabelled_edge (Graph.leaf identifier Graph.black) ] )
+          ("identifier", [ Tree.edge (Tree.vertex identifier) ])
       | List data_type ->
-          ( "list",
-            [ { edge_label = "element type"; vertex = to_graph data_type } ] )
+          ("list", [ Tree.edge ~label:"element type" (to_graph data_type) ])
     in
-    { vertex_label = label; colour = { r = 1.0; g = 0.1; b = 0.1 }; edges }
+    Tree.vertex ~colour:(Tree.rgb 1.0 0.1 0.1) ~edges label
 end
 
 module Expr = struct
@@ -136,64 +130,53 @@ module Expr = struct
     | Primary of primary_kind * string
   [@@deriving show]
 
-  let rec to_graph expr : Graph.t =
-    let label, (edges : Graph.edge list) =
+  let rec to_graph expr =
+    let label, edges =
       match expr.kind with
       | LetIn (pattern, data_type, bound_expr, body_expr) ->
           ( "let",
             [
-              { edge_label = "pattern"; vertex = Pattern.to_graph pattern };
-              { edge_label = "type"; vertex = DataType.to_graph data_type };
-              { edge_label = "bound expr"; vertex = to_graph bound_expr };
-              { edge_label = "in"; vertex = to_graph body_expr };
+              Tree.edge ~label:"pattern" (Pattern.to_graph pattern);
+              Tree.edge ~label:"type" (DataType.to_graph data_type);
+              Tree.edge ~label:"bound expr" (to_graph bound_expr);
+              Tree.edge ~label:"in" (to_graph body_expr);
             ] )
       | Match (expr, arms) ->
-          let arm_to_graph index (pattern, expr) =
-            Graph.unlabelled_edge
-              {
-                vertex_label = Printf.sprintf "arm %d" index;
-                colour = Graph.black;
-                edges =
-                  [
-                    {
-                      edge_label = "pattern";
-                      vertex = Pattern.to_graph pattern;
-                    };
-                    { edge_label = "expr"; vertex = to_graph expr };
-                  ];
-              }
+          let arm_to_edge index (pattern, expr) =
+            Tree.edge
+              (Tree.vertex
+                 ~edges:
+                   [
+                     Tree.edge ~label:"pattern" (Pattern.to_graph pattern);
+                     Tree.edge ~label:"expr" (to_graph expr);
+                   ]
+                 (Printf.sprintf "arm %d" index))
           in
           ( "match",
-            { edge_label = "expr"; vertex = to_graph expr }
-            :: List.mapi arm_to_graph arms )
+            Tree.edge ~label:"expr" (to_graph expr)
+            :: List.mapi arm_to_edge arms )
       | IfThenElse (condition, then_expr, else_expr) ->
           ( "if",
             [
-              { edge_label = "condition"; vertex = to_graph condition };
-              { edge_label = "then"; vertex = to_graph then_expr };
-              { edge_label = "else"; vertex = to_graph else_expr };
+              Tree.edge ~label:"condition" (to_graph condition);
+              Tree.edge ~label:"then" (to_graph then_expr);
+              Tree.edge ~label:"else" (to_graph else_expr);
             ] )
       | BinOp (op, lhs, rhs) ->
           ( "binary operation",
             [
-              { edge_label = "lhs"; vertex = to_graph lhs };
-              {
-                edge_label = "op";
-                vertex = Graph.leaf (display_binary_operator op) Graph.black;
-              };
-              { edge_label = "rhs"; vertex = to_graph rhs };
+              Tree.edge ~label:"lhs" (to_graph lhs);
+              Tree.edge ~label:"op" (Tree.vertex (display_binary_operator op));
+              Tree.edge ~label:"rhs" (to_graph rhs);
             ] )
       | UnaryOp (op, expr) ->
           ( "unary operation",
             [
-              {
-                edge_label = "op";
-                vertex = Graph.leaf (display_unary_operator op) Graph.black;
-              };
-              { edge_label = "expr"; vertex = to_graph expr };
+              Tree.edge ~label:"op" (Tree.vertex (display_unary_operator op));
+              Tree.edge ~label:"expr" (to_graph expr);
             ] )
       | Grouping expr ->
-          ("grouping", [ { edge_label = "expr"; vertex = to_graph expr } ])
+          ("grouping", [ Tree.edge ~label:"expr" (to_graph expr) ])
       | Primary (kind, value) ->
           (* Need to escape quotes properly if a string literal. *)
           let value =
@@ -206,14 +189,10 @@ module Expr = struct
             | _ -> value
           in
           ( "primary",
-            [
-              {
-                edge_label = display_primary_kind kind;
-                vertex = Graph.leaf value Graph.black;
-              };
-            ] )
+            [ Tree.edge ~label:(display_primary_kind kind) (Tree.vertex value) ]
+          )
     in
-    { vertex_label = label; colour = { r = 0.1; g = 0.1; b = 1.0 }; edges }
+    Tree.vertex ~colour:(Tree.rgb 0.1 0.1 1.0) ~edges label
 end
 
 type top_level_kind =
