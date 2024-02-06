@@ -6,6 +6,20 @@ its underlying model of computation.
 
 The compiler is handwritten in OCaml.
 
+## Roadmap
+
+An overview of the work needed to complete the project.
+
+* [x] Implement lexer.
+* [ ] Implement parser.
+  * [x] Design grammar.
+  * [ ] Ensure grammar is unambigious.
+  * [ ] Convert unambigious grammar to predictive parser.
+* [ ] Implement semantic analysis.
+  * [ ] Type checking.
+  * [ ] Ensuring pattern matching covers all cases.
+* [ ] FMC term generation.
+
 ## Features
 
 * System of effects based on FMC.
