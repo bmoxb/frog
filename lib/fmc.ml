@@ -1,10 +1,12 @@
+(** Functional Machine Calculus representation. *)
+
 type variable = string [@@deriving show]
 
 type location = string option [@@deriving show]
 
 type jump = string option [@@deriving show]
 
-(*
+(**
  * Term of the Functional Machine Calculus augmented with jumps.
  *
  * Grammar:

@@ -1,3 +1,5 @@
+(** Errors in an Osaka program (lexical, syntax, etc.) *)
+
 type lexical = { character : char; position : Position.t }
 
 type syntax = { token : Token.t; msg : string }

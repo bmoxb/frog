@@ -1,3 +1,5 @@
+(** Abstract Syntax Tree emitted by the parser. *)
+
 type identifier = string [@@deriving show]
 
 module Pattern = struct

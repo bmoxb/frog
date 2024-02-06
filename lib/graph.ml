@@ -1,3 +1,6 @@
+(** Basic representation of trees that can be converted into Graphviz DOT
+    format. *)
+
 type colour = { r : float; g : float; b : float }
 
 let black = { r = 0.0; g = 0.0; b = 0.0 }
