@@ -12,12 +12,12 @@ type vertex = { vertex_label : string; colour : colour; edges : edge list }
 
 and edge = { edge_label : string; vertex : vertex }
 
-let vertex ?(colour = rgb 0.0 0.0 0.0) ?(edges = []) label =
-  { vertex_label = label; colour; edges }
+type t = { root : vertex; horizontal_spacing : float; vertical_spacing : float }
 
-let edge ?(label = "") vertex = { edge_label = label; vertex }
+let init ?(horizontal_spacing = 0.5) ?(vertical_spacing = 0.5) root =
+  { root; horizontal_spacing; vertical_spacing }
 
-let to_dot root =
+let to_dot tree =
   let open Printf in
   let rec traverse parent_number vertex =
     let vertex_line =
@@ -40,5 +40,11 @@ let to_dot root =
     in
     (next_number, vertex_line :: List.flatten nested_child_lines)
   in
-  let _, lines = traverse 0 root in
-  "graph {\nnodesep = 1.0;\nranksep=1.0;\n" ^ String.concat "\n" lines ^ "\n}"
+  let _, lines = traverse 0 tree.root in
+  sprintf "graph {\nnodesep = %f;\nranksep = %f;\n%s\n}" tree.horizontal_spacing
+    tree.vertical_spacing (String.concat "\n" lines)
+
+let vertex ?(colour = rgb 0.0 0.0 0.0) ?(edges = []) label =
+  { vertex_label = label; colour; edges }
+
+let edge ?(label = "") vertex = { edge_label = label; vertex }
