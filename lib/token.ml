@@ -24,7 +24,8 @@ type kind =
   | GreaterThanOrEqual (* >= *)
   | LessThanOrEqual (* <= *)
   (* Identifiers / Keywords *)
-  | Identifier
+  | Identifier (* begins with underscore or lowercase letter *)
+  | CapitalisedIdentifier (* begins with uppercase letter *)
   | NotKeyword
   | AndKeyword
   | OrKeyword
@@ -41,10 +42,9 @@ type kind =
 type t = { kind : kind; position : Position.t } [@@deriving show]
 (** Represents a single token within a source file. *)
 
-(** Match a lexeme to either a keyword token kind or, if not a known keyword, an
-    identifier token kind. *)
-let lookup_identifier_or_keyword lexeme =
-  match lexeme with
+(** Match a lexeme to either a keyword token kind or, if not a known keyword,
+    an identifier (or capitalised identifier) token kind. *)
+let lookup_identifier_or_keyword = function
   | "not" -> NotKeyword
   | "and" -> AndKeyword
   | "or" -> OrKeyword
@@ -53,4 +53,6 @@ let lookup_identifier_or_keyword lexeme =
   | "else" -> ElseKeyword
   | "let" -> LetKeyword
   | "in" -> InKeyword
-  | _ -> Identifier
+  | lexeme ->
+      let is_uppercase = function 'A' .. 'Z' -> true | _ -> false in
+      if is_uppercase lexeme.[0] then CapitalisedIdentifier else Identifier
