@@ -201,15 +201,19 @@ module Expr = struct
       (to_tree_vertex expr)
 end
 
+(* IDENTFIER [ type ] *)
+type data_arm = identifier * DataType.t option [@@deriving show]
+
 type top_level_kind =
   (* "let" pattern ":" type "=" expr *)
   | Let of Pattern.t * DataType.t * Expr.t
   (* "alias" IDENTIFIER "=" type *)
   | Alias of identifier * DataType.t
-  (* "data" IDENTIFIER "=" [ "|" ] data_arm { "|" data_arm }
-     data_arm = IDENTFIER [ type] *)
-  | Data of identifier (* TODO *)
+  (* "data" IDENTIFIER "=" [ "|" ] data_arm { "|" data_arm } *)
+  | Data of identifier * data_arm list
 [@@deriving show]
 
 type top_level = { position : Position.t; kind : top_level_kind }
 [@@deriving show]
+(** A top-level definition. An AST is simply zero or more of these top-level
+    defitions. *)
