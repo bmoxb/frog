@@ -41,7 +41,7 @@ and let_in parser : t * Ast.Expr.t =
   let parser, start_offset, identifier, bound_expr = let_helper parser in
   let parser, _ = expect_kind InKeyword "Expected 'in' keyword." parser in
   let parser, body_expr = expr parser in
-  let ast_node : Ast.Expr.t =
+  let node : Ast.Expr.t =
     {
       position = { start_offset; end_offset = body_expr.position.end_offset };
       kind =
@@ -52,11 +52,35 @@ and let_in parser : t * Ast.Expr.t =
             body_expr );
     }
   in
-  (parser, ast_node)
+  (parser, node)
 
 and match_with parser = exit 0
 
-and if_then_else parser = exit 0
+and if_then_else parser =
+  let parser, if_token = advance parser in
+  let parser, condition = expr parser in
+  let parser, _ =
+    expect_kind Token.ThenKeyword
+      "Expected 'then' keyword after condition in if-then-else expression."
+      parser
+  in
+  let parser, then_expr = expr parser in
+  let parser, _ =
+    expect_kind Token.ElseKeyword
+      "Expected an 'else' clause as part of an if-then-else expression." parser
+  in
+  let parser, else_expr = expr parser in
+  let node : Ast.Expr.t =
+    {
+      position =
+        {
+          start_offset = if_token.position.start_offset;
+          end_offset = else_expr.position.end_offset;
+        };
+      kind = Ast.Expr.IfThenElse (condition, then_expr, else_expr);
+    }
+  in
+  (parser, node)
 
 (* logical_or = logical_and { "or" logical_and } *)
 and logical_or parser =
