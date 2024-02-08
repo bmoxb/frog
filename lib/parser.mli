@@ -7,3 +7,4 @@ val init : string -> Token.t list -> t
     (produced previously by the lexer) as input. *)
 
 val next_ast : t -> t * (Ast.t, Err.t) result option
+(* TODO: wrap the whole tuple in result option? *)

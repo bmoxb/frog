@@ -36,6 +36,8 @@ type kind =
   | InKeyword
   | AliasKeyword (* TODO: test *)
   | DataKeyword (* TODO: test *)
+  | MatchKeyword (* TODO: test *)
+  | WithKeyword (* TODO: test *)
   (* Literals *)
   | StringLiteral
   | NumberLiteral
@@ -57,6 +59,8 @@ let lookup_identifier_or_keyword = function
   | "in" -> InKeyword
   | "alias" -> AliasKeyword
   | "data" -> DataKeyword
+  | "match" -> MatchKeyword
+  | "with" -> WithKeyword
   | lexeme ->
       let is_uppercase = function 'A' .. 'Z' -> true | _ -> false in
       if is_uppercase lexeme.[0] then CapitalisedIdentifier else Identifier

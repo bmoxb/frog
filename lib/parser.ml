@@ -32,44 +32,31 @@ let expect_kind kind error_msg parser =
 let rec expr parser =
   match peek_kind parser with
   | Some LetKeyword -> let_in parser
-  (* TODO
-     | Some MatchKeyword -> match_with parser
-     | Some IfKeyword -> if_then_else parser
-  *)
+  | Some MatchKeyword -> match_with parser
+  | Some IfKeyword -> if_then_else parser
   | _ -> logical parser
 
-(* let_in = "let" pattern ":" type "=" expr "in" expr *)
+(* let_in = let "in" expr *)
 and let_in parser : t * Ast.Expr.t =
-  let open Token in
-  let parser, let_token = advance parser in
-  (* TODO: Pattern instead of identifier. *)
-  let parser, identifier_token =
-    expect_kind Identifier "Expected an identifier to bind an expression to."
-      parser
-  in
-  let identifier =
-    Position.substring parser.source_code identifier_token.position
-  in
-  let parser, _ = expect_kind Equals "Expected '=' token." parser in
-  let parser, bound_expr = expr parser in
+  let parser, start_offset, identifier, bound_expr = let_helper parser in
   let parser, _ = expect_kind InKeyword "Expected 'in' keyword." parser in
   let parser, body_expr = expr parser in
   let ast_node : Ast.Expr.t =
     {
-      position =
-        {
-          start_offset = let_token.position.start_offset;
-          end_offset = body_expr.position.end_offset;
-        };
+      position = { start_offset; end_offset = body_expr.position.end_offset };
       kind =
         Ast.Expr.LetIn
           ( Ast.Pattern.Identifier identifier,
-            Ast.DataType.Identifier "temp",
+            Ast.DataType.Identifier "TODO",
             bound_expr,
             body_expr );
     }
   in
   (parser, ast_node)
+
+and match_with parser = exit 0
+
+and if_then_else parser = exit 0
 
 and logical parser =
   (* TODO: seperate logical_or and logical_and rules. *)
@@ -182,11 +169,55 @@ and left_associative_binary_expr parser child_expr is_wanted_op =
       (parser, node)
   | _ -> (parser, left_expr)
 
+and let_helper parser =
+  let parser, let_token = advance parser in
+  (* TODO: Pattern instead of identifier. *)
+  let parser, identifier_token =
+    expect_kind Token.Identifier
+      "Expected an identifier to bind an expression to." parser
+  in
+  let identifier =
+    Position.substring parser.source_code identifier_token.position
+  in
+  let parser, _ = expect_kind Token.Equals "Expected '=' token." parser in
+  let parser, bound_expr = expr parser in
+  (parser, let_token.position.start_offset, identifier, bound_expr)
+
 (* let = "let" pattern ":" type "=" expr *)
-let let_binding parser = exit 0
+let let_binding parser =
+  let parser, start_offset, identifier, bound_expr = let_helper parser in
+  let ast : Ast.t =
+    {
+      position = { start_offset; end_offset = bound_expr.position.end_offset };
+      kind =
+        Ast.Let
+          ( Ast.Pattern.Identifier identifier,
+            Ast.DataType.Identifier "TODO",
+            bound_expr );
+    }
+  in
+  (parser, ast)
 
 (* alias = "alias" IDENTIFIER "=" type *)
-let type_alias parser = exit 0
+let type_alias parser =
+  let parser, alias_token = advance parser in
+  let parser, identifier_token =
+    expect_kind Token.Identifier
+      "Expected an identifier name for this type alias." parser
+  in
+  let identifier =
+    Position.substring parser.source_code identifier_token.position
+  in
+  let parser, _ = expect_kind Token.Equals "Expected '=' token." parser in
+  (* TODO: read type *)
+  let ast : Ast.t =
+    {
+      position =
+        { start_offset = alias_token.position.start_offset; end_offset = 0 };
+      kind = Ast.Alias (identifier, Ast.DataType.Identifier "TODO");
+    }
+  in
+  (parser, ast)
 
 (* data = "data" IDENTIFIER "=" [ "|" ] data_arm { "|" data_arm } *)
 let data_definition parser = exit 0
@@ -199,12 +230,17 @@ let top_level parser =
     | Token.DataKeyword -> data_definition parser
     | _ ->
         let _, unexpected_token = advance parser in
-        raise_syntax_error unexpected_token ""
+        let msg =
+          Printf.sprintf "Expected a top-level definition but got token '%s'."
+            (Position.substring parser.source_code unexpected_token.position)
+        in
+        raise_syntax_error unexpected_token msg
   in
   peek_kind parser |> Option.map match_kind
 
 let next_ast parser =
   try
-    let parser, ast_option = top_level parser in
-    ast_option |> Option.map (fun ast -> (parser, Some (Ok ast)))
+    match top_level parser with
+    | Some (parser, ast) -> (parser, Some (Ok ast))
+    | None -> (parser, None)
   with ErrException err -> (parser, Some (Error err))
