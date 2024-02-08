@@ -204,7 +204,7 @@ end
 (* IDENTFIER [ type ] *)
 type data_arm = identifier * DataType.t option [@@deriving show]
 
-type top_level_kind =
+type kind =
   (* "let" pattern ":" type "=" expr *)
   | Let of Pattern.t * DataType.t * Expr.t
   (* "alias" IDENTIFIER "=" type *)
@@ -213,7 +213,7 @@ type top_level_kind =
   | Data of identifier * data_arm list
 [@@deriving show]
 
-type top_level = { position : Position.t; kind : top_level_kind }
-[@@deriving show]
-(** A top-level definition. An AST is simply zero or more of these top-level
-    defitions. *)
+type t = { position : Position.t; kind : kind } [@@deriving show]
+(** A top-level definition. A full program is comprised of one or more
+    top-level definitions meaning a program's full AST is represented by a list
+    of t. *)

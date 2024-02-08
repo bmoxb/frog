@@ -2,20 +2,20 @@ type t = { source_code : string; tokens : Token.t list }
 
 let init source_code tokens = { source_code; tokens }
 
-(* Exception used to conveniently send syntax errors up the call stack. Must not
-   leak to the module's public interface. *)
+(* Exception used to conveniently send syntax errors up the call stack. Must
+   not leak to the module's public interface. *)
 exception ErrException of Err.t
 
 let raise_syntax_error token msg =
   raise_notrace (ErrException (Err.Syntax { token; msg }))
 
-(* See the token kind of the next token without changing the current position in
-   the token stream. *)
+(* See the token kind of the next token without changing the current position
+   in the token stream. *)
 let peek_kind parser =
   match parser.tokens with token :: _ -> Some token.kind | [] -> None
 
-(* Return the next token in the token stream and advance the current position by
-   one. *)
+(* Return the next token in the token stream and advance the current position
+   by one. *)
 let advance parser =
   match parser.tokens with
   | token :: tail -> ({ parser with tokens = tail }, token)
@@ -28,20 +28,18 @@ let expect_kind kind error_msg parser =
   if token.kind = kind then (parser, token)
   else raise_syntax_error token error_msg
 
-let rec parse_expr parser =
-  if List.is_empty parser.tokens then (parser, None)
-  else
-    try
-      let parser, expr = expr parser in
-      (parser, Some (Ok expr))
-    with ErrException err -> (parser, Some (Error err))
-
-and expr parser =
+(* expr = let_in | match | if_then_else | logical_or *)
+let rec expr parser =
   match peek_kind parser with
-  | Some LetKeyword -> let_binding parser
+  | Some LetKeyword -> let_in parser
+  (* TODO
+     | Some MatchKeyword -> match_with parser
+     | Some IfKeyword -> if_then_else parser
+  *)
   | _ -> logical parser
 
-and let_binding parser : t * Ast.Expr.t =
+(* let_in = "let" pattern ":" type "=" expr "in" expr *)
+and let_in parser : t * Ast.Expr.t =
   let open Token in
   let parser, let_token = advance parser in
   (* TODO: Pattern instead of identifier. *)
@@ -74,15 +72,18 @@ and let_binding parser : t * Ast.Expr.t =
   (parser, ast_node)
 
 and logical parser =
+  (* TODO: seperate logical_or and logical_and rules. *)
   let open Ast.Expr in
   let is_wanted_op = function And | Or -> true | _ -> false in
   left_associative_binary_expr parser equality is_wanted_op
 
+(* equality = comparison { ( "==" | "!=" ) comparison } *)
 and equality parser =
   let open Ast.Expr in
   let is_wanted_op = function Equiv | NotEquiv -> true | _ -> false in
   left_associative_binary_expr parser comparison is_wanted_op
 
+(* comparison = term { ( ">" | "<" | ">=" | "<=" ) term } *)
 and comparison parser =
   let open Ast.Expr in
   let is_wanted_op = function
@@ -91,16 +92,19 @@ and comparison parser =
   in
   left_associative_binary_expr parser term is_wanted_op
 
+(* term = factor { ( "+" | "-" ) factor } *)
 and term parser =
   let open Ast.Expr in
   let is_wanted_op = function Add | Subtract -> true | _ -> false in
   left_associative_binary_expr parser factor is_wanted_op
 
+(* factor = unary { ( "*" | "/" ) unary } *)
 and factor parser =
   let open Ast.Expr in
   let is_wanted_op = function Multiply | Divide -> true | _ -> false in
   left_associative_binary_expr parser unary is_wanted_op
 
+(* unary = ( "not" | "-" ) unary | primary *)
 and unary parser =
   match
     Option.bind (peek_kind parser) Ast.Expr.token_kind_to_unary_operator
@@ -121,6 +125,7 @@ and unary parser =
       (parser, node)
   | None -> primary parser
 
+(* primary = NUMBER | STRING | IDENTIFIER | "(" expr ")" *)
 and primary parser =
   let open Token in
   match Option.bind (peek_kind parser) Ast.Expr.token_kind_to_primary_kind with
@@ -133,6 +138,7 @@ and primary parser =
       (parser, node)
   | _ -> grouping parser
 
+(*  grouping = "(" expr ")" *)
 and grouping parser =
   let parser, token = advance parser in
   match token.kind with
@@ -175,3 +181,30 @@ and left_associative_binary_expr parser child_expr is_wanted_op =
       in
       (parser, node)
   | _ -> (parser, left_expr)
+
+(* let = "let" pattern ":" type "=" expr *)
+let let_binding parser = exit 0
+
+(* alias = "alias" IDENTIFIER "=" type *)
+let type_alias parser = exit 0
+
+(* data = "data" IDENTIFIER "=" [ "|" ] data_arm { "|" data_arm } *)
+let data_definition parser = exit 0
+
+(* top_level = let | alias | data *)
+let top_level parser =
+  let match_kind = function
+    | Token.LetKeyword -> let_binding parser
+    | Token.AliasKeyword -> type_alias parser
+    | Token.DataKeyword -> data_definition parser
+    | _ ->
+        let _, unexpected_token = advance parser in
+        raise_syntax_error unexpected_token ""
+  in
+  peek_kind parser |> Option.map match_kind
+
+let next_ast parser =
+  try
+    let parser, ast_option = top_level parser in
+    ast_option |> Option.map (fun ast -> (parser, Some (Ok ast)))
+  with ErrException err -> (parser, Some (Error err))
