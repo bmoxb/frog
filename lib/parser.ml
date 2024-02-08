@@ -34,7 +34,7 @@ let rec expr parser =
   | Some LetKeyword -> let_in parser
   | Some MatchKeyword -> match_with parser
   | Some IfKeyword -> if_then_else parser
-  | _ -> logical parser
+  | _ -> logical_or parser
 
 (* let_in = let "in" expr *)
 and let_in parser : t * Ast.Expr.t =
@@ -58,11 +58,13 @@ and match_with parser = exit 0
 
 and if_then_else parser = exit 0
 
-and logical parser =
-  (* TODO: seperate logical_or and logical_and rules. *)
-  let open Ast.Expr in
-  let is_wanted_op = function And | Or -> true | _ -> false in
-  left_associative_binary_expr parser equality is_wanted_op
+(* logical_or = logical_and { "or" logical_and } *)
+and logical_or parser =
+  left_associative_binary_expr parser logical_and (( == ) Ast.Expr.Or)
+
+(* logical_and = equality { "and" equality } *)
+and logical_and parser =
+  left_associative_binary_expr parser equality (( == ) Ast.Expr.And)
 
 (* equality = comparison { ( "==" | "!=" ) comparison } *)
 and equality parser =
@@ -112,7 +114,7 @@ and unary parser =
       (parser, node)
   | None -> primary parser
 
-(* primary = NUMBER | STRING | IDENTIFIER | "(" expr ")" *)
+(* primary = NUMBER | STRING | IDENTIFIER | grouping *)
 and primary parser =
   let open Token in
   match Option.bind (peek_kind parser) Ast.Expr.token_kind_to_primary_kind with
