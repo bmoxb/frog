@@ -116,7 +116,7 @@ module Expr = struct
   type t = { position : Position.t; kind : kind } [@@deriving show]
 
   and kind =
-    (* "let" pattern "=" expr "in" expr *)
+    (* "let" pattern ":" type "=" expr "in" expr *)
     | LetIn of Pattern.t * DataType.t * t * t
     (* "match" expr "with" [ "|" ] match_arm { "|" match_arm }
        match_arm = pattern "->" expr *)

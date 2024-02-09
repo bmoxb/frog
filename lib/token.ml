@@ -2,27 +2,31 @@
     compilation. *)
 
 type kind =
-  | OpenBracket
-  | CloseBracket
-  | OpenCurly
-  | CloseCurly
-  | Plus
-  | Minus
-  | Star
-  | Slash
-  | Equals
-  | Colon
-  | Semicolon
-  | Dot
-  | Comma
-  | Exclamation
-  | GreaterThan
-  | LessThan
+  | OpenBracket (* ( *)
+  | CloseBracket (* ) *)
+  | OpenCurly (* { *)
+  | CloseCurly (* } *)
+  | Plus (* + *)
+  | Minus (* - *)
   | Arrow (* -> *)
-  | NotEquiv (* != *)
+  | Star (* * *)
+  | Slash (* / *)
+  | Equals (* = *)
   | Equiv (* == *)
+  | Colon (* : *)
+  | Semicolon (* ; *)
+  | Dot (* . *)
+  | Comma (* , *)
+  | Exclamation (* ! *)
+  | NotEquiv (* != *)
+  | GreaterThan (* > *)
   | GreaterThanOrEqual (* >= *)
+  | LessThan (* < *)
   | LessThanOrEqual (* <= *)
+  | Pipe (* | *)
+  (* Literals *)
+  | StringLiteral
+  | NumberLiteral
   (* Identifiers / Keywords *)
   | Identifier (* begins with underscore or lowercase letter *)
   | CapitalisedIdentifier (* begins with uppercase letter *)
@@ -38,9 +42,6 @@ type kind =
   | DataKeyword (* TODO: test *)
   | MatchKeyword (* TODO: test *)
   | WithKeyword (* TODO: test *)
-  (* Literals *)
-  | StringLiteral
-  | NumberLiteral
 [@@deriving show]
 
 type t = { kind : kind; position : Position.t } [@@deriving show]

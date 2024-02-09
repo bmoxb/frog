@@ -88,6 +88,7 @@ let next_token_kind c lexer =
       conditionally_advance
         (fun c -> c = '=')
         ~if_match:LessThanOrEqual ~otherwise:LessThan lexer
+  | '|' -> (lexer, Ok Pipe)
   | '"' -> handle_string lexer
   | c when is_digit c -> handle_number lexer
   | c when is_identifier c -> handle_identifier lexer

@@ -28,6 +28,13 @@ let expect_kind kind error_msg parser =
   if token.kind = kind then (parser, token)
   else raise_syntax_error token error_msg
 
+let advance_if_kind kind parser =
+  match peek_kind parser with
+  | Some k when k = kind ->
+      let parser, _ = advance parser in
+      parser
+  | _ -> parser
+
 (* expr = let_in | match | if_then_else | logical_or *)
 let rec expr parser =
   match peek_kind parser with
@@ -54,8 +61,60 @@ and let_in parser : t * Ast.Expr.t =
   in
   (parser, node)
 
-and match_with parser = exit 0
+(* match = "match" expr "with" [ "|" ] match_arm { "|" match_arm } *)
+and match_with parser =
+  let rec additional_match_arms parser =
+    match peek_kind parser with
+    | Some Token.Pipe ->
+        let parser, _ = advance parser in
+        let parser, arm = match_arm parser in
+        let parser, arms = additional_match_arms parser in
+        (parser, arm :: arms)
+    | _ -> (parser, [])
+  in
+  let parser, match_token = advance parser in
+  let parser, condition = expr parser in
+  let parser, _ =
+    expect_kind Token.WithKeyword
+      "Expected 'then' keyword after condition in match expression." parser
+  in
+  (* The first pipe is optional. *)
+  let parser = advance_if_kind Token.Pipe parser in
+  let parser, head_arm = match_arm parser in
+  let parser, tail_arms = additional_match_arms parser in
+  let arms = head_arm :: tail_arms in
+  (* TODO: Unnecessary traversal of the list. *)
+  let _, (final_expr : Ast.Expr.t) = List.nth arms (List.length arms - 1) in
+  let node : Ast.Expr.t =
+    {
+      position =
+        {
+          start_offset = match_token.position.start_offset;
+          end_offset = final_expr.position.end_offset;
+        };
+      kind = Ast.Expr.Match (condition, head_arm :: tail_arms);
+    }
+  in
+  (parser, node)
 
+(* match_arm = pattern "->" expr *)
+and match_arm parser =
+  (* TODO: Pattern, not identifier. *)
+  let parser, identifier_token =
+    expect_kind Token.Identifier "Expected a pattern to match on." parser
+  in
+  let identifier =
+    Position.substring parser.source_code identifier_token.position
+  in
+  let parser, _ =
+    expect_kind Token.Arrow
+      "Expected an arrow '->' token after pattern in match arm." parser
+  in
+  let parser, body = expr parser in
+  let arm = (Ast.Pattern.Identifier identifier, body) in
+  (parser, arm)
+
+(* if_then_else = "if" expr "then" expr "else" expr *)
 and if_then_else parser =
   let parser, if_token = advance parser in
   let parser, condition = expr parser in
