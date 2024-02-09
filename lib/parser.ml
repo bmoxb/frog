@@ -61,25 +61,31 @@ let rec data_type parser =
     | Token.OpenSquare -> Some (list_data_type parser)
     | _ -> None)
 
+and expect_data_type parser =
+  match data_type parser with
+  | Some result -> result
+  | _ ->
+      let _, token = advance parser in
+      raise_syntax_error token "Expected a data type."
+
 and identifier_data_type parser =
   let parser, identifier_token = advance parser in
   let identifier =
     Position.substring parser.source_code identifier_token.position
   in
-  (parser, Ast.DataType.Identifier identifier)
+  ( parser,
+    identifier_token.position.end_offset,
+    Ast.DataType.Identifier identifier )
 
 and list_data_type parser =
-  let parser, open_token = advance parser in
-  match data_type parser with
-  | Some (parser, element_type) ->
-      let parser, _ =
-        expect_kind Token.CloseSquare
-          "Expected list type to end with closing ']'." parser
-      in
-      (parser, Ast.DataType.List element_type)
-  | None ->
-      raise_syntax_error open_token
-        "Expected a type for elements in this list type."
+  (* Consume opening bracket. *)
+  let parser, _ = advance parser in
+  let parser, _, element_type = expect_data_type parser in
+  let parser, close_token =
+    expect_kind Token.CloseSquare "Expected list type to end with closing ']'."
+      parser
+  in
+  (parser, close_token.position.end_offset, Ast.DataType.List element_type)
 
 (* expr = let_in | match | if_then_else | logical_or *)
 let rec expr parser =
@@ -91,7 +97,9 @@ let rec expr parser =
 
 (* let_in = let "in" expr *)
 and let_in parser : t * Ast.Expr.t =
-  let parser, start_offset, identifier, bound_expr = parse_let parser in
+  let parser, start_offset, identifier, data_type, bound_expr =
+    parse_let parser
+  in
   let parser, _ = expect_kind InKeyword "Expected 'in' keyword." parser in
   let parser, body_expr = expr parser in
   let node : Ast.Expr.t =
@@ -99,10 +107,7 @@ and let_in parser : t * Ast.Expr.t =
       position = { start_offset; end_offset = body_expr.position.end_offset };
       kind =
         Ast.Expr.LetIn
-          ( Ast.Pattern.Identifier identifier,
-            Ast.DataType.Identifier "TODO",
-            bound_expr,
-            body_expr );
+          (Ast.Pattern.Identifier identifier, data_type, bound_expr, body_expr);
     }
   in
   (parser, node)
@@ -238,7 +243,7 @@ and primary parser =
         }
       in
       (parser, node)
-  | _ -> grouping parser
+  | None -> grouping parser
 
 (*  grouping = "(" expr ")" *)
 and grouping parser =
@@ -266,6 +271,7 @@ and left_associative_binary_expr parser child_expr is_wanted_op =
   let peeked_kind = peek_kind parser in
   match Option.bind peeked_kind Ast.Expr.token_kind_to_binary_operator with
   | Some op when is_wanted_op op ->
+      (* Consume the operator token. *)
       let parser, _ = advance parser in
       let parser, right_expr =
         left_associative_binary_expr parser child_expr is_wanted_op
@@ -295,21 +301,24 @@ and parse_let parser =
   let identifier =
     Position.substring parser.source_code identifier_token.position
   in
+  let parser, _ =
+    expect_kind Token.Colon
+      "Expected ':' token and a type for the binding being introduced." parser
+  in
+  let parser, _, data_type = expect_data_type parser in
   let parser, _ = expect_kind Token.Equals "Expected '=' token." parser in
   let parser, bound_expr = expr parser in
-  (parser, let_token.position.start_offset, identifier, bound_expr)
+  (parser, let_token.position.start_offset, identifier, data_type, bound_expr)
 
 (* let = "let" pattern ":" type "=" expr *)
 let let_binding parser =
-  let parser, start_offset, identifier, bound_expr = parse_let parser in
+  let parser, start_offset, identifier, data_type, bound_expr =
+    parse_let parser
+  in
   let ast : Ast.t =
     {
       position = { start_offset; end_offset = bound_expr.position.end_offset };
-      kind =
-        Ast.Let
-          ( Ast.Pattern.Identifier identifier,
-            Ast.DataType.Identifier "TODO",
-            bound_expr );
+      kind = Ast.Let (Ast.Pattern.Identifier identifier, data_type, bound_expr);
     }
   in
   (parser, ast)
@@ -325,12 +334,12 @@ let type_alias parser =
     Position.substring parser.source_code identifier_token.position
   in
   let parser, _ = expect_kind Token.Equals "Expected '=' token." parser in
-  (* TODO: read type *)
+  let parser, end_offset, data_type = expect_data_type parser in
   let ast : Ast.t =
     {
       position =
-        { start_offset = alias_token.position.start_offset; end_offset = 0 };
-      kind = Ast.Alias (identifier, Ast.DataType.Identifier "TODO");
+        { start_offset = alias_token.position.start_offset; end_offset };
+      kind = Ast.Alias (identifier, data_type);
     }
   in
   (parser, ast)
@@ -344,9 +353,14 @@ let data_arm parser =
   let identifier =
     Position.substring parser.source_code identifier_token.position
   in
-  (* TODO: type *)
-  let arm = (identifier, Some (Ast.DataType.Identifier "TODO")) in
-  (parser, identifier_token.position.end_offset, arm)
+  let parser, end_offset, data_type_opt =
+    match data_type parser with
+    | Some (parser, end_offset, data_type) ->
+        (parser, end_offset, Some data_type)
+    | None -> (parser, identifier_token.position.end_offset, None)
+  in
+  let arm = (identifier, data_type_opt) in
+  (parser, end_offset, arm)
 
 (* data = "data" IDENTIFIER "=" [ "|" ] data_arm { "|" data_arm } *)
 let data_definition parser =
