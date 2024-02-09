@@ -35,6 +35,23 @@ let advance_if_kind kind parser =
       parser
   | _ -> parser
 
+(* Helper function for parsing match and data arms. *)
+let parse_arms parse_arm parser =
+  let rec additional_arms end_offset parser =
+    match peek_kind parser with
+    | Some Token.Pipe ->
+        let parser, _ = advance parser in
+        let parser, end_offset, arm = parse_arm parser in
+        let parser, end_offset, arms = additional_arms end_offset parser in
+        (parser, end_offset, arm :: arms)
+    | _ -> (parser, end_offset, [])
+  in
+  (* The first pipe is optional. *)
+  let parser = advance_if_kind Token.Pipe parser in
+  let parser, end_offset, head_arm = parse_arm parser in
+  let parser, end_offset, tail_arms = additional_arms end_offset parser in
+  (parser, end_offset, head_arm :: tail_arms)
+
 (* expr = let_in | match | if_then_else | logical_or *)
 let rec expr parser =
   match peek_kind parser with
@@ -45,7 +62,7 @@ let rec expr parser =
 
 (* let_in = let "in" expr *)
 and let_in parser : t * Ast.Expr.t =
-  let parser, start_offset, identifier, bound_expr = let_helper parser in
+  let parser, start_offset, identifier, bound_expr = parse_let parser in
   let parser, _ = expect_kind InKeyword "Expected 'in' keyword." parser in
   let parser, body_expr = expr parser in
   let node : Ast.Expr.t =
@@ -63,36 +80,18 @@ and let_in parser : t * Ast.Expr.t =
 
 (* match = "match" expr "with" [ "|" ] match_arm { "|" match_arm } *)
 and match_with parser =
-  let rec additional_match_arms parser =
-    match peek_kind parser with
-    | Some Token.Pipe ->
-        let parser, _ = advance parser in
-        let parser, arm = match_arm parser in
-        let parser, arms = additional_match_arms parser in
-        (parser, arm :: arms)
-    | _ -> (parser, [])
-  in
   let parser, match_token = advance parser in
   let parser, condition = expr parser in
   let parser, _ =
     expect_kind Token.WithKeyword
       "Expected 'then' keyword after condition in match expression." parser
   in
-  (* The first pipe is optional. *)
-  let parser = advance_if_kind Token.Pipe parser in
-  let parser, head_arm = match_arm parser in
-  let parser, tail_arms = additional_match_arms parser in
-  let arms = head_arm :: tail_arms in
-  (* TODO: Unnecessary traversal of the list. *)
-  let _, (final_expr : Ast.Expr.t) = List.nth arms (List.length arms - 1) in
+  let parser, end_offset, arms = parse_arms match_arm parser in
   let node : Ast.Expr.t =
     {
       position =
-        {
-          start_offset = match_token.position.start_offset;
-          end_offset = final_expr.position.end_offset;
-        };
-      kind = Ast.Expr.Match (condition, head_arm :: tail_arms);
+        { start_offset = match_token.position.start_offset; end_offset };
+      kind = Ast.Expr.Match (condition, arms);
     }
   in
   (parser, node)
@@ -112,7 +111,7 @@ and match_arm parser =
   in
   let parser, body = expr parser in
   let arm = (Ast.Pattern.Identifier identifier, body) in
-  (parser, arm)
+  (parser, body.position.end_offset, arm)
 
 (* if_then_else = "if" expr "then" expr "else" expr *)
 and if_then_else parser =
@@ -254,7 +253,9 @@ and left_associative_binary_expr parser child_expr is_wanted_op =
       (parser, node)
   | _ -> (parser, left_expr)
 
-and let_helper parser =
+(* Helper function for parsing a top-level let definition or the first part of
+   a let-in expression. *)
+and parse_let parser =
   let parser, let_token = advance parser in
   (* TODO: Pattern instead of identifier. *)
   let parser, identifier_token =
@@ -270,7 +271,7 @@ and let_helper parser =
 
 (* let = "let" pattern ":" type "=" expr *)
 let let_binding parser =
-  let parser, start_offset, identifier, bound_expr = let_helper parser in
+  let parser, start_offset, identifier, bound_expr = parse_let parser in
   let ast : Ast.t =
     {
       position = { start_offset; end_offset = bound_expr.position.end_offset };
@@ -304,8 +305,38 @@ let type_alias parser =
   in
   (parser, ast)
 
+(* data_arm = CAPITALISED_IDENTIFIER [ type ] *)
+let data_arm parser =
+  let parser, identifier_token =
+    expect_kind Token.CapitalisedIdentifier "Expected a constructor identifier."
+      parser
+  in
+  let identifier =
+    Position.substring parser.source_code identifier_token.position
+  in
+  (* TODO: type *)
+  let arm = (identifier, Some (Ast.DataType.Identifier "TODO")) in
+  (parser, identifier_token.position.end_offset, arm)
+
 (* data = "data" IDENTIFIER "=" [ "|" ] data_arm { "|" data_arm } *)
-let data_definition parser = exit 0
+let data_definition parser =
+  let parser, data_token = advance parser in
+  let parser, identifier_token =
+    expect_kind Token.Identifier
+      "Expected an identifier name for the data definition." parser
+  in
+  let identifier =
+    Position.substring parser.source_code identifier_token.position
+  in
+  let parser, _ = expect_kind Token.Equals "Expected '=' token." parser in
+  let parser, end_offset, arms = parse_arms data_arm parser in
+  let node : Ast.t =
+    {
+      position = { start_offset = data_token.position.start_offset; end_offset };
+      kind = Ast.Data (identifier, arms);
+    }
+  in
+  (parser, node)
 
 (* top_level = let | alias | data *)
 let top_level parser =
