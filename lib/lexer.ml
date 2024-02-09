@@ -61,6 +61,8 @@ let next_token_kind c lexer =
   | ')' -> (lexer, Ok CloseBracket)
   | '{' -> (lexer, Ok OpenCurly)
   | '}' -> (lexer, Ok CloseCurly)
+  | '[' -> (lexer, Ok OpenSquare)
+  | ']' -> (lexer, Ok CloseSquare)
   | '+' -> (lexer, Ok Plus)
   | '-' ->
       conditionally_advance

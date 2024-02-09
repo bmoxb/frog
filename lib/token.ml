@@ -6,6 +6,8 @@ type kind =
   | CloseBracket (* ) *)
   | OpenCurly (* { *)
   | CloseCurly (* } *)
+  | OpenSquare (* [ *)
+  | CloseSquare (* ] *)
   | Plus (* + *)
   | Minus (* - *)
   | Arrow (* -> *)

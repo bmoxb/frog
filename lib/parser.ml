@@ -28,6 +28,8 @@ let expect_kind kind error_msg parser =
   if token.kind = kind then (parser, token)
   else raise_syntax_error token error_msg
 
+(* If the peeked token has the given kind, advance. Otherwise, do nothing. This
+   is used to consume optional tokens. *)
 let advance_if_kind kind parser =
   match peek_kind parser with
   | Some k when k = kind ->
@@ -51,6 +53,32 @@ let parse_arms parse_arm parser =
   let parser, end_offset, head_arm = parse_arm parser in
   let parser, end_offset, tail_arms = additional_arms end_offset parser in
   (parser, end_offset, head_arm :: tail_arms)
+
+let rec data_type parser =
+  Option.bind (peek_kind parser) (function
+    | Token.Identifier -> Some (identifier_data_type parser)
+    | Token.OpenSquare -> Some (list_data_type parser)
+    | _ -> None)
+
+and identifier_data_type parser =
+  let parser, identifier_token = advance parser in
+  let identifier =
+    Position.substring parser.source_code identifier_token.position
+  in
+  (parser, Ast.DataType.Identifier identifier)
+
+and list_data_type parser =
+  let parser, open_token = advance parser in
+  match data_type parser with
+  | Some (parser, element_type) ->
+      let parser, _ =
+        expect_kind Token.CloseSquare
+          "Expected list type to end with closing ']'." parser
+      in
+      (parser, Ast.DataType.List element_type)
+  | None ->
+      raise_syntax_error open_token
+        "Expected a type for elements in this list type."
 
 (* expr = let_in | match | if_then_else | logical_or *)
 let rec expr parser =
