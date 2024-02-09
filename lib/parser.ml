@@ -54,6 +54,7 @@ let parse_arms parse_arm parser =
   let parser, end_offset, tail_arms = additional_arms end_offset parser in
   (parser, end_offset, head_arm :: tail_arms)
 
+(* type = IDENTIFIER | "[" type "]" *)
 let rec data_type parser =
   Option.bind (peek_kind parser) (function
     | Token.Identifier -> Some (identifier_data_type parser)
@@ -170,11 +171,11 @@ and if_then_else parser =
 
 (* logical_or = logical_and { "or" logical_and } *)
 and logical_or parser =
-  left_associative_binary_expr parser logical_and (( == ) Ast.Expr.Or)
+  left_associative_binary_expr parser logical_and (( = ) Ast.Expr.Or)
 
 (* logical_and = equality { "and" equality } *)
 and logical_and parser =
-  left_associative_binary_expr parser equality (( == ) Ast.Expr.And)
+  left_associative_binary_expr parser equality (( = ) Ast.Expr.And)
 
 (* equality = comparison { ( "==" | "!=" ) comparison } *)
 and equality parser =
@@ -226,38 +227,39 @@ and unary parser =
 
 (* primary = NUMBER | STRING | IDENTIFIER | grouping *)
 and primary parser =
-  let open Token in
   match Option.bind (peek_kind parser) Ast.Expr.token_kind_to_primary_kind with
-  | Some kind ->
+  | Some primary_kind ->
       let parser, token = advance parser in
       let lexeme = Position.substring parser.source_code token.position in
       let node : Ast.Expr.t =
-        { position = token.position; kind = Ast.Expr.Primary (kind, lexeme) }
+        {
+          position = token.position;
+          kind = Ast.Expr.Primary (primary_kind, lexeme);
+        }
       in
       (parser, node)
   | _ -> grouping parser
 
 (*  grouping = "(" expr ")" *)
 and grouping parser =
-  let parser, token = advance parser in
-  match token.kind with
-  | OpenBracket ->
-      let parser, expr = expr parser in
-      let parser, close_token =
-        expect_kind CloseBracket "Expected closing ')' token." parser
-      in
-      let node : Ast.Expr.t =
+  let parser, open_token =
+    expect_kind Token.OpenBracket "Expected primary expression." parser
+  in
+  let parser, expr = expr parser in
+  let parser, close_token =
+    expect_kind CloseBracket "Expected closing ')' token." parser
+  in
+  let node : Ast.Expr.t =
+    {
+      position =
         {
-          position =
-            {
-              start_offset = token.position.start_offset;
-              end_offset = close_token.position.end_offset;
-            };
-          kind = Ast.Expr.Grouping expr;
-        }
-      in
-      (parser, node)
-  | _ -> raise_syntax_error token "Expected primary expression."
+          start_offset = open_token.position.start_offset;
+          end_offset = close_token.position.end_offset;
+        };
+      kind = Ast.Expr.Grouping expr;
+    }
+  in
+  (parser, node)
 
 and left_associative_binary_expr parser child_expr is_wanted_op =
   let parser, left_expr = child_expr parser in
@@ -383,8 +385,4 @@ let top_level parser =
   peek_kind parser |> Option.map match_kind
 
 let next_ast parser =
-  try
-    match top_level parser with
-    | Some (parser, ast) -> (parser, Some (Ok ast))
-    | None -> (parser, None)
-  with ErrException err -> (parser, Some (Error err))
+  try Ok (top_level parser) with ErrException err -> Error err
