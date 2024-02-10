@@ -3,5 +3,6 @@
 type t
 
 val init : string -> t
+(** Initialise a parser with the given source code as input. *)
 
-val next_token : t -> t * (Token.t, Err.t) result option
+val next_token : t -> ((t * Token.t) option, Err.t) result
