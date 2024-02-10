@@ -2,27 +2,33 @@
     compilation. *)
 
 type kind =
-  | OpenBracket
-  | CloseBracket
-  | OpenCurly
-  | CloseCurly
-  | Plus
-  | Minus
-  | Star
-  | Slash
-  | Equals
-  | Colon
-  | Semicolon
-  | Dot
-  | Comma
-  | Exclamation
-  | GreaterThan
-  | LessThan
+  | OpenBracket (* ( *)
+  | CloseBracket (* ) *)
+  | OpenCurly (* { *)
+  | CloseCurly (* } *)
+  | OpenSquare (* [ *)
+  | CloseSquare (* ] *)
+  | Plus (* + *)
+  | Minus (* - *)
   | Arrow (* -> *)
-  | NotEquiv (* != *)
+  | Star (* * *)
+  | Slash (* / *)
+  | Equals (* = *)
   | Equiv (* == *)
+  | Colon (* : *)
+  | Semicolon (* ; *)
+  | Dot (* . *)
+  | Comma (* , *)
+  | Exclamation (* ! *)
+  | NotEquiv (* != *)
+  | GreaterThan (* > *)
   | GreaterThanOrEqual (* >= *)
+  | LessThan (* < *)
   | LessThanOrEqual (* <= *)
+  | Pipe (* | *)
+  (* Literals *)
+  | StringLiteral
+  | NumberLiteral
   (* Identifiers / Keywords *)
   | Identifier (* begins with underscore or lowercase letter *)
   | CapitalisedIdentifier (* begins with uppercase letter *)
@@ -34,9 +40,10 @@ type kind =
   | ElseKeyword
   | LetKeyword
   | InKeyword
-  (* Literals *)
-  | StringLiteral
-  | NumberLiteral
+  | AliasKeyword (* TODO: test *)
+  | DataKeyword (* TODO: test *)
+  | MatchKeyword (* TODO: test *)
+  | WithKeyword (* TODO: test *)
 [@@deriving show]
 
 type t = { kind : kind; position : Position.t } [@@deriving show]
@@ -53,6 +60,10 @@ let lookup_identifier_or_keyword = function
   | "else" -> ElseKeyword
   | "let" -> LetKeyword
   | "in" -> InKeyword
+  | "alias" -> AliasKeyword
+  | "data" -> DataKeyword
+  | "match" -> MatchKeyword
+  | "with" -> WithKeyword
   | lexeme ->
       let is_uppercase = function 'A' .. 'Z' -> true | _ -> false in
       if is_uppercase lexeme.[0] then CapitalisedIdentifier else Identifier
