@@ -21,6 +21,12 @@ let advance parser =
   | token :: tail -> ({ parser with tokens = tail }, token)
   | [] -> raise_notrace (ErrException Err.UnexpectedEOF)
 
+(* Call advance and get the lexeme of the returned token. *)
+let advance_with_lexeme parser =
+  let parser, token = advance parser in
+  let lexeme = Position.substring parser.source_code token.position in
+  (parser, token, lexeme)
+
 (* If the next token has the given token kind, advance the current position.
    Otherwise, produce an error. *)
 let expect_kind kind error_msg parser =
@@ -74,13 +80,8 @@ and expect_data_type parser =
   expect_or_syntax_error "Expected a data type." data_type parser
 
 and identifier_data_type parser =
-  let parser, identifier_token = advance parser in
-  let identifier =
-    Position.substring parser.source_code identifier_token.position
-  in
-  ( parser,
-    identifier_token.position.end_offset,
-    Ast.DataType.Identifier identifier )
+  let parser, token, identifier = advance_with_lexeme parser in
+  (parser, token.position.end_offset, Ast.DataType.Identifier identifier)
 
 and list_data_type parser =
   (* Consume opening bracket. *)
@@ -91,6 +92,32 @@ and list_data_type parser =
       parser
   in
   (parser, close_token.position.end_offset, Ast.DataType.List element_type)
+
+(* pattern = IDENTIFIER | CAPITALISED_IDENTIFIER [ pattern ] *)
+let rec pattern parser =
+  Option.bind (peek_kind parser) (function
+    | Token.Identifier -> Some (identifier_pattern parser)
+    | Token.CapitalisedIdentifier -> Some (type_constructor_pattern parser)
+    | _ -> None)
+
+and identifier_pattern parser =
+  let parser, token, identifier = advance_with_lexeme parser in
+  (parser, token.position.end_offset, Ast.Pattern.Identifier identifier)
+
+and type_constructor_pattern parser =
+  let parser, identifier_token, identifier = advance_with_lexeme parser in
+  match pattern parser with
+  | Some (parser, end_offset, argument) ->
+      ( parser,
+        end_offset,
+        Ast.Pattern.TypeConstructor (identifier, Some argument) )
+  | None ->
+      ( parser,
+        identifier_token.position.end_offset,
+        Ast.Pattern.TypeConstructor (identifier, None) )
+
+let expect_pattern parser =
+  expect_or_syntax_error "Expected a pattern." pattern parser
 
 (* expr = let_in | match | if_then_else | logical_or *)
 let rec expr parser =
@@ -112,7 +139,10 @@ and let_in parser : t * Ast.Expr.t =
       position = { start_offset; end_offset = body_expr.position.end_offset };
       kind =
         Ast.Expr.LetIn
-          (Ast.Pattern.Identifier identifier, data_type, bound_expr, body_expr);
+          ( [ Ast.Pattern.Identifier identifier ],
+            data_type,
+            bound_expr,
+            body_expr );
     }
   in
   (parser, node)
@@ -263,8 +293,7 @@ and application parser =
 and primary parser =
   match Option.bind (peek_kind parser) Ast.Expr.token_kind_to_primary_kind with
   | Some primary_kind ->
-      let parser, token = advance parser in
-      let lexeme = Position.substring parser.source_code token.position in
+      let parser, token, lexeme = advance_with_lexeme parser in
       let node : Ast.Expr.t =
         {
           position = token.position;
@@ -351,7 +380,8 @@ let let_binding parser =
   let ast : Ast.t =
     {
       position = { start_offset; end_offset = bound_expr.position.end_offset };
-      kind = Ast.Let (Ast.Pattern.Identifier identifier, data_type, bound_expr);
+      kind =
+        Ast.Let ([ Ast.Pattern.Identifier identifier ], data_type, bound_expr);
     }
   in
   (parser, ast)
@@ -422,10 +452,10 @@ let top_level parser =
     | Token.AliasKeyword -> type_alias parser
     | Token.DataKeyword -> data_definition parser
     | _ ->
-        let _, unexpected_token = advance parser in
+        let _, unexpected_token, lexeme = advance_with_lexeme parser in
         let msg =
           Printf.sprintf "Expected a top-level definition but got token '%s'."
-            (Position.substring parser.source_code unexpected_token.position)
+            lexeme
         in
         raise_syntax_error unexpected_token msg
   in
