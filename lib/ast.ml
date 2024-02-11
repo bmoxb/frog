@@ -3,7 +3,10 @@
 type identifier = string [@@deriving show]
 
 module Pattern = struct
-  type t = Identifier of identifier | List of t list | Cons of t * t
+  type t =
+    | Identifier of identifier
+    | TypeConstructor of identifier * t option
+    | Literal of string
   [@@deriving show]
 
   let rec to_tree_vertex pattern =
@@ -11,23 +14,26 @@ module Pattern = struct
       match pattern with
       | Identifier identifier ->
           ("identifier", [ Tree.edge (Tree.vertex identifier) ])
-      | List patterns ->
-          if List.is_empty patterns then ("empty list", [])
-          else
-            ( "list",
-              List.mapi
-                (fun index pattern ->
-                  Tree.edge ~label:(string_of_int index)
-                    (to_tree_vertex pattern))
-                patterns )
-      | Cons (head, tail) ->
-          ( "cons",
-            [
-              Tree.edge ~label:"head" (to_tree_vertex head);
-              Tree.edge ~label:"tail" (to_tree_vertex tail);
-            ] )
+      | TypeConstructor (identifier, pattern_opt) ->
+          (* If pattern_opt is some then this is a list with a single edge.
+             Otherwise, it is an empty list. *)
+          let pattern_edge_list =
+            pattern_opt
+            |> Option.map (fun pattern ->
+                   [ Tree.edge ~label:"argument" (to_tree_vertex pattern) ])
+            |> Option.value ~default:[]
+          in
+          ( "type constructor",
+            Tree.edge ~label:"identifier" (Tree.vertex identifier)
+            :: pattern_edge_list )
+      | Literal literal -> ("literal", [ Tree.edge (Tree.vertex literal) ])
     in
     Tree.vertex ~colour:(Tree.rgb 1.0 0.75 0.8) ~edges label
+
+  let to_indexed_tree_edge index pattern =
+    Tree.edge
+      ~label:(Printf.sprintf "pattern %d" index)
+      (to_tree_vertex pattern)
 end
 
 module DataType = struct
@@ -116,8 +122,8 @@ module Expr = struct
   type t = { position : Position.t; kind : kind } [@@deriving show]
 
   and kind =
-    (* "let" pattern ":" type "=" expr "in" expr *)
-    | LetIn of Pattern.t * DataType.t * t * t
+    (* "let" pattern { pattern } ":" type "=" expr "in" expr *)
+    | LetIn of Pattern.t list * DataType.t * t * t
     (* "match" expr "with" [ "|" ] match_arm { "|" match_arm } *)
     | Match of t * match_arm list
     (* "if" expr "then" expr "else" expr *)
@@ -139,14 +145,14 @@ module Expr = struct
   let rec to_tree_vertex expr =
     let label, edges =
       match expr.kind with
-      | LetIn (pattern, data_type, bound_expr, body_expr) ->
+      | LetIn (patterns, data_type, bound_expr, body_expr) ->
           ( "let-in",
-            [
-              Tree.edge ~label:"pattern" (Pattern.to_tree_vertex pattern);
-              Tree.edge ~label:"type" (DataType.to_tree_vertex data_type);
-              Tree.edge ~label:"bound expr" (to_tree_vertex bound_expr);
-              Tree.edge ~label:"in" (to_tree_vertex body_expr);
-            ] )
+            List.mapi Pattern.to_indexed_tree_edge patterns
+            @ [
+                Tree.edge ~label:"type" (DataType.to_tree_vertex data_type);
+                Tree.edge ~label:"bound expr" (to_tree_vertex bound_expr);
+                Tree.edge ~label:"in" (to_tree_vertex body_expr);
+              ] )
       | Match (expr, arms) ->
           ( "match",
             Tree.edge ~label:"expr" (to_tree_vertex expr)
@@ -236,8 +242,8 @@ let data_arm_to_edge index (constructor_identifier, data_type_opt) =
        (Printf.sprintf "arm %d" index))
 
 type kind =
-  (* "let" pattern ":" type "=" expr *)
-  | Let of Pattern.t * DataType.t * Expr.t
+  (* "let" pattern { pattern } ":" type "=" expr *)
+  | Let of Pattern.t list * DataType.t * Expr.t
   (* "alias" IDENTIFIER "=" type *)
   | Alias of identifier * DataType.t
   (* "data" IDENTIFIER "=" [ "|" ] data_arm { "|" data_arm } *)
@@ -251,13 +257,13 @@ type t = { position : Position.t; kind : kind } [@@deriving show]
 let to_tree_vertex node =
   let label, edges =
     match node.kind with
-    | Let (pattern, data_type, expr) ->
+    | Let (patterns, data_type, expr) ->
         ( "let",
-          [
-            Tree.edge ~label:"pattern" (Pattern.to_tree_vertex pattern);
-            Tree.edge ~label:"type" (DataType.to_tree_vertex data_type);
-            Tree.edge ~label:"expr" (Expr.to_tree_vertex expr);
-          ] )
+          List.mapi Pattern.to_indexed_tree_edge patterns
+          @ [
+              Tree.edge ~label:"type" (DataType.to_tree_vertex data_type);
+              Tree.edge ~label:"expr" (Expr.to_tree_vertex expr);
+            ] )
     | Alias (identifier, data_type) ->
         ( "alias",
           [
