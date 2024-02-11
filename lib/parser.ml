@@ -209,7 +209,7 @@ and factor parser =
   let is_wanted_op = function Multiply | Divide -> true | _ -> false in
   left_associative_binary_expr parser unary is_wanted_op
 
-(* unary = ( "not" | "-" ) unary | primary *)
+(* unary = ( "not" | "-" ) unary | application *)
 and unary parser =
   match
     Option.bind (peek_kind parser) Ast.Expr.token_kind_to_unary_operator
@@ -228,7 +228,34 @@ and unary parser =
         }
       in
       (parser, node)
-  | None -> primary parser
+  | None -> application parser
+
+(* application = primary primary { primary } *)
+and application parser =
+  let rec additional_primary_exprs ?(end_offset = 0) parser =
+    let open Token in
+    match peek_kind parser with
+    (* TODO: Shouldn't need to peek token kind here. *)
+    | Some (NumberLiteral | StringLiteral | Identifier | OpenBracket) ->
+        let parser, (expr : Ast.Expr.t) = primary parser in
+        let parser, end_offset, exprs =
+          additional_primary_exprs ~end_offset:expr.position.end_offset parser
+        in
+        (parser, end_offset, expr :: exprs)
+    | _ -> (parser, end_offset, [])
+  in
+  let parser, first_expr = primary parser in
+  let parser, end_offset, exprs = additional_primary_exprs parser in
+  if not (List.is_empty exprs) then
+    let node : Ast.Expr.t =
+      {
+        position =
+          { start_offset = first_expr.position.start_offset; end_offset };
+        kind = Ast.Expr.Application (first_expr, exprs);
+      }
+    in
+    (parser, node)
+  else (parser, first_expr)
 
 (* primary = NUMBER | STRING | IDENTIFIER | grouping *)
 and primary parser =
