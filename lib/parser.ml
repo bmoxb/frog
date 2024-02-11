@@ -107,20 +107,15 @@ let rec pattern parser =
     | _ -> None)
 
 and identifier_pattern parser =
-  let parser, token, identifier = advance_with_lexeme parser in
-  (parser, token.position.end_offset, Ast.Pattern.Identifier identifier)
+  let parser, _, identifier = advance_with_lexeme parser in
+  (parser, Ast.Pattern.Identifier identifier)
 
 and type_constructor_pattern parser =
-  let parser, identifier_token, identifier = advance_with_lexeme parser in
+  let parser, _, identifier = advance_with_lexeme parser in
   match pattern parser with
-  | Some (parser, end_offset, argument) ->
-      ( parser,
-        end_offset,
-        Ast.Pattern.TypeConstructor (identifier, Some argument) )
-  | None ->
-      ( parser,
-        identifier_token.position.end_offset,
-        Ast.Pattern.TypeConstructor (identifier, None) )
+  | Some (parser, argument) ->
+      (parser, Ast.Pattern.TypeConstructor (identifier, Some argument))
+  | None -> (parser, Ast.Pattern.TypeConstructor (identifier, None))
 
 let expect_pattern parser =
   expect_or_syntax_error pattern "Expected a pattern." parser
@@ -168,7 +163,7 @@ and match_with parser =
 
 (* match_arm = pattern "->" expr *)
 and match_arm parser =
-  let parser, _, pattern = expect_pattern parser in
+  let parser, pattern = expect_pattern parser in
   let parser, _ =
     expect_kind Token.Arrow
       "Expected an arrow '->' token after pattern in match arm." parser
@@ -271,18 +266,18 @@ and application parser =
         (parser, end_offset, expr :: exprs)
     | None -> (parser, end_offset, [])
   in
-  let parser, (first_expr : Ast.Expr.t) = expect_primary parser in
-  let parser, end_offset, exprs = additional_primary_exprs parser in
-  if not (List.is_empty exprs) then
+  let parser, (head_expr : Ast.Expr.t) = expect_primary parser in
+  let parser, end_offset, tail_exprs = additional_primary_exprs parser in
+  if not (List.is_empty tail_exprs) then
     let node : Ast.Expr.t =
       {
         position =
-          { start_offset = first_expr.position.start_offset; end_offset };
-        kind = Ast.Expr.Application (first_expr, exprs);
+          { start_offset = head_expr.position.start_offset; end_offset };
+        kind = Ast.Expr.Application (head_expr, tail_exprs);
       }
     in
     (parser, node)
-  else (parser, first_expr)
+  else (parser, head_expr)
 
 (* primary = NUMBER | STRING | IDENTIFIER | grouping *)
 and primary parser =
@@ -323,6 +318,7 @@ and grouping parser =
       Some (parser, node)
   | _ -> None
 
+(* Helper function for parsing left associative binary expressions. *)
 and left_associative_binary_expr parser child_expr is_wanted_op =
   let parser, left_expr = child_expr parser in
   let peeked_kind = peek_kind parser in
@@ -349,9 +345,16 @@ and left_associative_binary_expr parser child_expr is_wanted_op =
 (* Helper function for parsing a top-level let definition or the first part of
    a let-in expression. *)
 and parse_let parser =
+  let rec additional_patterns parser =
+    match pattern parser with
+    | Some (parser, pattern) ->
+        let parser, tail = additional_patterns parser in
+        (parser, pattern :: tail)
+    | None -> (parser, [])
+  in
   let parser, let_token = advance parser in
-  let parser, _, pattern = expect_pattern parser in
-  (* TODO: Multiple patterns *)
+  let parser, head_pattern = expect_pattern parser in
+  let parser, tail_patterns = additional_patterns parser in
   let parser, _ =
     expect_kind Token.Colon
       "Expected ':' token and a type for the binding being introduced." parser
@@ -359,9 +362,13 @@ and parse_let parser =
   let parser, _, data_type = expect_data_type parser in
   let parser, _ = expect_kind Token.Equals "Expected '=' token." parser in
   let parser, bound_expr = expr parser in
-  (parser, let_token.position.start_offset, [ pattern ], data_type, bound_expr)
+  ( parser,
+    let_token.position.start_offset,
+    head_pattern :: tail_patterns,
+    data_type,
+    bound_expr )
 
-(* let = "let" pattern ":" type "=" expr *)
+(* let = "let" pattern { pattern } ":" type "=" expr *)
 let let_binding parser =
   let parser, start_offset, patterns, data_type, bound_expr =
     parse_let parser
