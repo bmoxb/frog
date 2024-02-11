@@ -129,7 +129,7 @@ let rec expr parser =
 
 (* let_in = let "in" expr *)
 and let_in parser : t * Ast.Expr.t =
-  let parser, start_offset, identifier, data_type, bound_expr =
+  let parser, start_offset, patterns, data_type, bound_expr =
     parse_let parser
   in
   let parser, _ = expect_kind InKeyword "Expected 'in' keyword." parser in
@@ -137,12 +137,7 @@ and let_in parser : t * Ast.Expr.t =
   let node : Ast.Expr.t =
     {
       position = { start_offset; end_offset = body_expr.position.end_offset };
-      kind =
-        Ast.Expr.LetIn
-          ( [ Ast.Pattern.Identifier identifier ],
-            data_type,
-            bound_expr,
-            body_expr );
+      kind = Ast.Expr.LetIn (patterns, data_type, bound_expr, body_expr);
     }
   in
   (parser, node)
@@ -167,19 +162,13 @@ and match_with parser =
 
 (* match_arm = pattern "->" expr *)
 and match_arm parser =
-  (* TODO: Pattern, not identifier. *)
-  let parser, identifier_token =
-    expect_kind Token.Identifier "Expected a pattern to match on." parser
-  in
-  let identifier =
-    Position.substring parser.source_code identifier_token.position
-  in
+  let parser, _, pattern = expect_pattern parser in
   let parser, _ =
     expect_kind Token.Arrow
       "Expected an arrow '->' token after pattern in match arm." parser
   in
   let parser, body = expr parser in
-  let arm = (Ast.Pattern.Identifier identifier, body) in
+  let arm = (pattern, body) in
   (parser, body.position.end_offset, arm)
 
 (* if_then_else = "if" expr "then" expr "else" expr *)
@@ -355,14 +344,8 @@ and left_associative_binary_expr parser child_expr is_wanted_op =
    a let-in expression. *)
 and parse_let parser =
   let parser, let_token = advance parser in
-  (* TODO: Pattern instead of identifier. *)
-  let parser, identifier_token =
-    expect_kind Token.Identifier
-      "Expected an identifier to bind an expression to." parser
-  in
-  let identifier =
-    Position.substring parser.source_code identifier_token.position
-  in
+  let parser, _, pattern = expect_pattern parser in
+  (* TODO: Multiple patterns *)
   let parser, _ =
     expect_kind Token.Colon
       "Expected ':' token and a type for the binding being introduced." parser
@@ -370,18 +353,17 @@ and parse_let parser =
   let parser, _, data_type = expect_data_type parser in
   let parser, _ = expect_kind Token.Equals "Expected '=' token." parser in
   let parser, bound_expr = expr parser in
-  (parser, let_token.position.start_offset, identifier, data_type, bound_expr)
+  (parser, let_token.position.start_offset, [ pattern ], data_type, bound_expr)
 
 (* let = "let" pattern ":" type "=" expr *)
 let let_binding parser =
-  let parser, start_offset, identifier, data_type, bound_expr =
+  let parser, start_offset, patterns, data_type, bound_expr =
     parse_let parser
   in
   let ast : Ast.t =
     {
       position = { start_offset; end_offset = bound_expr.position.end_offset };
-      kind =
-        Ast.Let ([ Ast.Pattern.Identifier identifier ], data_type, bound_expr);
+      kind = Ast.Let (patterns, data_type, bound_expr);
     }
   in
   (parser, ast)
