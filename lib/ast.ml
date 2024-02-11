@@ -126,6 +126,8 @@ module Expr = struct
     | BinOp of binary_operator * t * t
     (* unary_operator expr *)
     | UnaryOp of unary_operator * t
+    (* expr expr { expr } *)
+    | Application of t * t list
     (* "(" expr ")" *)
     | Grouping of t
     | Primary of primary_kind * string
@@ -169,6 +171,15 @@ module Expr = struct
               Tree.edge ~label:"op" (Tree.vertex (display_unary_operator op));
               Tree.edge ~label:"expr" (to_tree_vertex expr);
             ] )
+      | Application (fn, args) ->
+          let arg_to_edge index arg =
+            Tree.edge
+              ~label:(Printf.sprintf "arg %d" index)
+              (to_tree_vertex arg)
+          in
+          ( "function application",
+            Tree.edge ~label:"function" (to_tree_vertex fn)
+            :: List.mapi arg_to_edge args )
       | Grouping expr ->
           ("grouping", [ Tree.edge ~label:"expr" (to_tree_vertex expr) ])
       | Primary (kind, value) ->

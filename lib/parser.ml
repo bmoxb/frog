@@ -37,6 +37,15 @@ let advance_if_kind kind parser =
       parser
   | _ -> parser
 
+(* Call the given syntax rule function and if some unwrap and return the
+   result. If none then just produce a syntax error. *)
+let expect_or_syntax_error msg rule parser =
+  match rule parser with
+  | Some result -> result
+  | None ->
+      let _, token = advance parser in
+      raise_syntax_error token msg
+
 (* Helper function for parsing match and data arms. *)
 let parse_arms parse_arm parser =
   let rec additional_arms end_offset parser =
@@ -62,11 +71,7 @@ let rec data_type parser =
     | _ -> None)
 
 and expect_data_type parser =
-  match data_type parser with
-  | Some result -> result
-  | _ ->
-      let _, token = advance parser in
-      raise_syntax_error token "Expected a data type."
+  expect_or_syntax_error "Expected a data type." data_type parser
 
 and identifier_data_type parser =
   let parser, identifier_token = advance parser in
@@ -209,7 +214,7 @@ and factor parser =
   let is_wanted_op = function Multiply | Divide -> true | _ -> false in
   left_associative_binary_expr parser unary is_wanted_op
 
-(* unary = ( "not" | "-" ) unary | primary *)
+(* unary = ( "not" | "-" ) unary | application *)
 and unary parser =
   match
     Option.bind (peek_kind parser) Ast.Expr.token_kind_to_unary_operator
@@ -228,7 +233,31 @@ and unary parser =
         }
       in
       (parser, node)
-  | None -> primary parser
+  | None -> application parser
+
+(* application = primary primary { primary } *)
+and application parser =
+  let rec additional_primary_exprs ?(end_offset = 0) parser =
+    match primary parser with
+    | Some (parser, (expr : Ast.Expr.t)) ->
+        let parser, end_offset, exprs =
+          additional_primary_exprs ~end_offset:expr.position.end_offset parser
+        in
+        (parser, end_offset, expr :: exprs)
+    | None -> (parser, end_offset, [])
+  in
+  let parser, (first_expr : Ast.Expr.t) = expect_primary parser in
+  let parser, end_offset, exprs = additional_primary_exprs parser in
+  if not (List.is_empty exprs) then
+    let node : Ast.Expr.t =
+      {
+        position =
+          { start_offset = first_expr.position.start_offset; end_offset };
+        kind = Ast.Expr.Application (first_expr, exprs);
+      }
+    in
+    (parser, node)
+  else (parser, first_expr)
 
 (* primary = NUMBER | STRING | IDENTIFIER | grouping *)
 and primary parser =
@@ -242,29 +271,33 @@ and primary parser =
           kind = Ast.Expr.Primary (primary_kind, lexeme);
         }
       in
-      (parser, node)
+      Some (parser, node)
   | None -> grouping parser
+
+and expect_primary parser =
+  expect_or_syntax_error "Expected primary expression" primary parser
 
 (*  grouping = "(" expr ")" *)
 and grouping parser =
-  let parser, open_token =
-    expect_kind Token.OpenBracket "Expected primary expression." parser
-  in
-  let parser, expr = expr parser in
-  let parser, close_token =
-    expect_kind CloseBracket "Expected closing ')' token." parser
-  in
-  let node : Ast.Expr.t =
-    {
-      position =
+  match peek_kind parser with
+  | Some Token.OpenBracket ->
+      let parser, open_token = advance parser in
+      let parser, expr = expr parser in
+      let parser, close_token =
+        expect_kind CloseBracket "Expected closing ')' token." parser
+      in
+      let node : Ast.Expr.t =
         {
-          start_offset = open_token.position.start_offset;
-          end_offset = close_token.position.end_offset;
-        };
-      kind = Ast.Expr.Grouping expr;
-    }
-  in
-  (parser, node)
+          position =
+            {
+              start_offset = open_token.position.start_offset;
+              end_offset = close_token.position.end_offset;
+            };
+          kind = Ast.Expr.Grouping expr;
+        }
+      in
+      Some (parser, node)
+  | _ -> None
 
 and left_associative_binary_expr parser child_expr is_wanted_op =
   let parser, left_expr = child_expr parser in
