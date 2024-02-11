@@ -174,7 +174,7 @@ module Expr = struct
       | Application (fn, args) ->
           let arg_to_edge index arg =
             Tree.edge
-              ~label:(Printf.sprintf "argument %d" index)
+              ~label:(Printf.sprintf "arg %d" index)
               (to_tree_vertex arg)
           in
           ( "function application",
