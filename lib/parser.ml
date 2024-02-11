@@ -27,13 +27,6 @@ let advance_with_lexeme parser =
   let lexeme = Position.substring parser.source_code token.position in
   (parser, token, lexeme)
 
-(* If the next token has the given token kind, advance the current position.
-   Otherwise, produce an error. *)
-let expect_kind kind error_msg parser =
-  let parser, token = advance parser in
-  if token.kind = kind then (parser, token)
-  else raise_syntax_error token error_msg
-
 (* If the peeked token has the given kind, advance. Otherwise, do nothing. This
    is used to consume optional tokens. *)
 let advance_if_kind kind parser =
@@ -43,9 +36,22 @@ let advance_if_kind kind parser =
       parser
   | _ -> parser
 
+(* If the next token has the given token kind, advance the current position.
+   Otherwise, produce an error. *)
+let expect_kind kind error_msg parser =
+  let parser, token = advance parser in
+  if token.kind = kind then (parser, token)
+  else raise_syntax_error token error_msg
+
+(* Call expect_kind and get the lexeme of the returned token. *)
+let expect_kind_with_lexeme kind error_msg parser =
+  let parser, token = expect_kind kind error_msg parser in
+  let lexeme = Position.substring parser.source_code token.position in
+  (parser, token, lexeme)
+
 (* Call the given syntax rule function and if some unwrap and return the
    result. If none then just produce a syntax error. *)
-let expect_or_syntax_error msg rule parser =
+let expect_or_syntax_error rule msg parser =
   match rule parser with
   | Some result -> result
   | None ->
@@ -77,7 +83,7 @@ let rec data_type parser =
     | _ -> None)
 
 and expect_data_type parser =
-  expect_or_syntax_error "Expected a data type." data_type parser
+  expect_or_syntax_error data_type "Expected a data type." parser
 
 and identifier_data_type parser =
   let parser, token, identifier = advance_with_lexeme parser in
@@ -117,7 +123,7 @@ and type_constructor_pattern parser =
         Ast.Pattern.TypeConstructor (identifier, None) )
 
 let expect_pattern parser =
-  expect_or_syntax_error "Expected a pattern." pattern parser
+  expect_or_syntax_error pattern "Expected a pattern." parser
 
 (* expr = let_in | match | if_then_else | logical_or *)
 let rec expr parser =
@@ -293,7 +299,7 @@ and primary parser =
   | None -> grouping parser
 
 and expect_primary parser =
-  expect_or_syntax_error "Expected primary expression" primary parser
+  expect_or_syntax_error primary "Expected primary expression" parser
 
 (*  grouping = "(" expr ")" *)
 and grouping parser =
@@ -371,12 +377,9 @@ let let_binding parser =
 (* alias = "alias" IDENTIFIER "=" type *)
 let type_alias parser =
   let parser, alias_token = advance parser in
-  let parser, identifier_token =
-    expect_kind Token.Identifier
+  let parser, _, identifier =
+    expect_kind_with_lexeme Token.Identifier
       "Expected an identifier name for this type alias." parser
-  in
-  let identifier =
-    Position.substring parser.source_code identifier_token.position
   in
   let parser, _ = expect_kind Token.Equals "Expected '=' token." parser in
   let parser, end_offset, data_type = expect_data_type parser in
@@ -391,12 +394,9 @@ let type_alias parser =
 
 (* data_arm = CAPITALISED_IDENTIFIER [ type ] *)
 let data_arm parser =
-  let parser, identifier_token =
-    expect_kind Token.CapitalisedIdentifier "Expected a constructor identifier."
-      parser
-  in
-  let identifier =
-    Position.substring parser.source_code identifier_token.position
+  let parser, identifier_token, identifier =
+    expect_kind_with_lexeme Token.CapitalisedIdentifier
+      "Expected a constructor identifier." parser
   in
   let parser, end_offset, data_type_opt =
     match data_type parser with
@@ -410,12 +410,9 @@ let data_arm parser =
 (* data = "data" IDENTIFIER "=" [ "|" ] data_arm { "|" data_arm } *)
 let data_definition parser =
   let parser, data_token = advance parser in
-  let parser, identifier_token =
-    expect_kind Token.Identifier
+  let parser, _, identifier =
+    expect_kind_with_lexeme Token.Identifier
       "Expected an identifier name for the data definition." parser
-  in
-  let identifier =
-    Position.substring parser.source_code identifier_token.position
   in
   let parser, _ = expect_kind Token.Equals "Expected '=' token." parser in
   let parser, end_offset, arms = parse_arms data_arm parser in
