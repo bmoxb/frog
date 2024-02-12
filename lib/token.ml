@@ -50,6 +50,8 @@ type kind =
 type t = { kind : kind; position : Position.t } [@@deriving show]
 (** Represents a single token within a source file. *)
 
+let lexeme source_code token = Position.substring source_code token.position
+
 (** Match a lexeme to either a keyword token kind or, if not a known keyword,
     an identifier (or capitalised identifier) token kind. *)
 let lookup_identifier_or_keyword = function
