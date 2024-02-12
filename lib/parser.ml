@@ -58,36 +58,38 @@ let parse_arms parse_arm parser =
 
 (* type = simple_type [ { simple_type } "->" simple_type { simple_type } ] *)
 let rec data_type parser =
-  let rec additional_simple_types end_offset parser =
+  let rec additional_simple_types parser =
     match simple_type parser with
-    | Some (parser, end_offset, head) ->
-        let parser, end_offset, tail =
-          additional_simple_types end_offset parser
-        in
-        (parser, end_offset, head :: tail)
-    | None -> (parser, end_offset, [])
+    | Some (parser, head) ->
+        let parser, tail = additional_simple_types parser in
+        (parser, head :: tail)
+    | None -> (parser, [])
   in
   (* Either map a simple type into a function type (if possible) or return as
      is. *)
-  let maybe_into_function_type (parser, end_offset, head_type) =
-    let parser, end_offset, tail_types =
-      additional_simple_types end_offset parser
-    in
+  let maybe_into_function_type (parser, (head_type : Ast.DataType.t)) =
+    let parser, tail_types = additional_simple_types parser in
+    (* If there are no following simple types or a '->' token, then this must
+       just be a single simple type rather than a function type. *)
     if List.is_empty tail_types && peek_kind parser <> Some Token.Arrow then
-      (parser, end_offset, head_type)
+      (parser, head_type)
     else
       let parser, _ =
         expect_kind Token.Arrow "Expected '->' in function type." parser
       in
-      let parser, end_offset, return_head_type = expect_simple_type parser in
-      let parser, end_offset, return_tail_types =
-        additional_simple_types end_offset parser
+      let parser, return_head_type = expect_simple_type parser in
+      let parser, return_tail_types = additional_simple_types parser in
+      let node : Ast.DataType.t =
+        {
+          (* TODO: end *)
+          position =
+            { start_offset = head_type.position.start_offset; end_offset = 0 };
+          kind =
+            Ast.DataType.Function
+              (head_type :: tail_types, return_head_type :: return_tail_types);
+        }
       in
-      let node =
-        Ast.DataType.Function
-          (head_type :: tail_types, return_head_type :: return_tail_types)
-      in
-      (parser, end_offset, node)
+      (parser, node)
   in
   simple_type parser |> Option.map maybe_into_function_type
 
@@ -96,23 +98,33 @@ and expect_data_type parser =
 
 (* simple_type = [ "@" ] IDENTIFIER *)
 and simple_type parser =
-  let parser, at_token_opt = advance_if_kind Token.At parser in
-  if Option.is_some at_token_opt then
-    let parser, identifier_token =
-      expect_kind Token.Identifier
-        "Expected an identifier for this location type." parser
-    in
-    let identifier = Token.lexeme parser.source_code identifier_token in
-    let node = Ast.DataType.Location identifier in
-    Some (parser, identifier_token.position.end_offset, node)
-  else
-    Option.bind (peek_kind parser) (function
-      | Token.Identifier ->
-          let parser, identifier_token = advance parser in
-          let identifier = Token.lexeme parser.source_code identifier_token in
-          let node = Ast.DataType.Identifier identifier in
-          Some (parser, identifier_token.position.end_offset, node)
-      | _ -> None)
+  match peek_kind parser with
+  | Some Token.At ->
+      let parser, at_token = advance parser in
+      let parser, identifier_token =
+        expect_kind Token.Identifier
+          "Expected an identifier for this location type." parser
+      in
+      let identifier = Token.lexeme parser.source_code identifier_token in
+      let node : Ast.DataType.t =
+        {
+          position =
+            {
+              start_offset = at_token.position.start_offset;
+              end_offset = identifier_token.position.end_offset;
+            };
+          kind = Ast.DataType.Location identifier;
+        }
+      in
+      Some (parser, node)
+  | Some Token.Identifier ->
+      let parser, token = advance parser in
+      let identifier = Token.lexeme parser.source_code token in
+      let node : Ast.DataType.t =
+        { position = token.position; kind = Ast.DataType.Identifier identifier }
+      in
+      Some (parser, node)
+  | _ -> None
 
 and expect_simple_type parser =
   expect_or_syntax_error simple_type "Expected a simple type." parser
@@ -129,7 +141,10 @@ let rec pattern parser =
 and identifier_pattern parser =
   let parser, token = advance parser in
   let identifier = Token.lexeme parser.source_code token in
-  (parser, Ast.Pattern.Identifier identifier)
+  let node : Ast.Pattern.t =
+    { position = token.position; kind = Ast.Pattern.Identifier identifier }
+  in
+  (parser, node)
 
 (* type_constructor_pattern = CAPITALISED_IDENTIFIER [ pattern ] *)
 and type_constructor_pattern parser =
@@ -137,14 +152,31 @@ and type_constructor_pattern parser =
   let identifier = Token.lexeme parser.source_code token in
   match pattern parser with
   | Some (parser, argument) ->
-      (parser, Ast.Pattern.TypeConstructor (identifier, Some argument))
-  | None -> (parser, Ast.Pattern.TypeConstructor (identifier, None))
+      let node : Ast.Pattern.t =
+        {
+          position =
+            {
+              start_offset = token.position.start_offset;
+              end_offset = argument.position.end_offset;
+            };
+          kind = Ast.Pattern.TypeConstructor (identifier, Some argument);
+        }
+      in
+      (parser, node)
+  | None ->
+      let node : Ast.Pattern.t =
+        {
+          position = token.position;
+          kind = Ast.Pattern.TypeConstructor (identifier, None);
+        }
+      in
+      (parser, node)
 
 (* literal_pattern = NUMBER | STRING *)
 and literal_pattern parser =
   let parser, token = advance parser in
   let literal = Token.lexeme parser.source_code token in
-  (parser, Ast.Pattern.Literal literal)
+  (parser, { position = token.position; kind = Ast.Pattern.Literal literal })
 
 let expect_pattern parser =
   expect_or_syntax_error pattern "Expected a pattern." parser
@@ -324,12 +356,12 @@ and primary parser =
   | None -> grouping parser
 
 and expect_primary parser =
-  expect_or_syntax_error primary "Expected primary expression" parser
+  expect_or_syntax_error primary "Expected primary expression." parser
 
 (*  grouping = "(" expr ")" *)
 and grouping parser =
   match peek_kind parser with
-  | Some Token.OpenBracket ->
+  | Some OpenBracket ->
       let parser, open_token = advance parser in
       let parser, expr = expr parser in
       let parser, close_token =
@@ -389,7 +421,7 @@ and parse_let parser =
     expect_kind Token.Colon
       "Expected ':' token and a type for the binding being introduced." parser
   in
-  let parser, _, data_type = expect_data_type parser in
+  let parser, data_type = expect_data_type parser in
   let parser, _ = expect_kind Token.Equals "Expected '=' token." parser in
   let parser, bound_expr = expr parser in
   ( parser,
@@ -420,11 +452,14 @@ let type_alias parser =
   in
   let identifier = Token.lexeme parser.source_code token in
   let parser, _ = expect_kind Token.Equals "Expected '=' token." parser in
-  let parser, end_offset, data_type = expect_data_type parser in
+  let parser, data_type = expect_data_type parser in
   let node : Ast.t =
     {
       position =
-        { start_offset = alias_token.position.start_offset; end_offset };
+        {
+          start_offset = alias_token.position.start_offset;
+          end_offset = data_type.position.end_offset;
+        };
       kind = Ast.Alias (identifier, data_type);
     }
   in
@@ -437,14 +472,10 @@ let data_arm parser =
       parser
   in
   let identifier = Token.lexeme parser.source_code token in
-  let parser, end_offset, data_type_opt =
-    match data_type parser with
-    | Some (parser, end_offset, data_type) ->
-        (parser, end_offset, Some data_type)
-    | None -> (parser, token.position.end_offset, None)
-  in
-  let arm = (identifier, data_type_opt) in
-  (parser, end_offset, arm)
+  match data_type parser with
+  | Some (parser, data_type) ->
+      (parser, data_type.position.end_offset, (identifier, Some data_type))
+  | None -> (parser, token.position.end_offset, (identifier, None))
 
 (* data = "data" IDENTIFIER "=" [ "|" ] data_arm { "|" data_arm } *)
 let data_definition parser =
@@ -477,7 +508,6 @@ let top_level parser =
           Printf.sprintf "Expected a top-level definition but got token '%s'."
             lexeme
         in
-        raise_syntax_error unexpected_token msg
+        Err.raise_syntax_error unexpected_token msg
   in
-  try Ok (peek_kind parser |> Option.map match_kind)
-  with ErrException err -> Error err
+  peek_kind parser |> Option.map match_kind

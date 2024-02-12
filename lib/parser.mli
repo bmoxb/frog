@@ -11,13 +11,16 @@ val top_level : t -> (t * Ast.t) option
     @raise Err.Exception *)
 
 val data_type : t -> (t * Ast.DataType.t) option
-(** Parse a data type.
+(** Parse a data type. Will return none if peeked token is not the start of a
+    data type or if EOF.
     @raise Err.Exception *)
 
 val pattern : t -> (t * Ast.Pattern.t) option
-(** Parse a pattern.
+(** Parse a pattern. Will return none if peeked token is not the start of a
+    pattern or if EOF.
     @raise Err.Exception *)
 
-val expr : t -> (t * Ast.Expr.t) option
-(** Paerse an expression.
+val expr : t -> t * Ast.Expr.t
+(** Parse an expression. Will raise an exception if an expression could not be
+    parsed (including due to EOF).
     @raise Err.Exception *)
