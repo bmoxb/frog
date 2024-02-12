@@ -14,15 +14,6 @@ let advance parser =
   | token :: tail -> ({ parser with tokens = tail }, token)
   | [] -> Err.raise_unexpected_eof ()
 
-(* If the peeked token has the given kind, advance. Otherwise, do nothing. This
-   is used to consume optional tokens. *)
-let advance_if_kind kind parser =
-  match peek_kind parser with
-  | Some k when k = kind ->
-      let parser, token = advance parser in
-      (parser, Some token)
-  | _ -> (parser, None)
-
 (* If the next token has the given token kind, advance the current position.
    Otherwise, produce an error. *)
 let expect_kind kind error_msg parser =
@@ -51,7 +42,13 @@ let parse_arms parse_arm parser =
     | _ -> (parser, end_offset, [])
   in
   (* The first pipe is optional. *)
-  let parser, _ = advance_if_kind Token.Pipe parser in
+  let parser =
+    match peek_kind parser with
+    | Some Token.Pipe ->
+        let parser, _ = advance parser in
+        parser
+    | _ -> parser
+  in
   let parser, end_offset, head_arm = parse_arm parser in
   let parser, end_offset, tail_arms = additional_arms end_offset parser in
   (parser, end_offset, head_arm :: tail_arms)
