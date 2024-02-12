@@ -26,6 +26,7 @@ type kind =
   | LessThan (* < *)
   | LessThanOrEqual (* <= *)
   | Pipe (* | *)
+  | At (* @ *)
   (* Literals *)
   | StringLiteral
   | NumberLiteral

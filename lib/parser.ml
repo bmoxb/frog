@@ -32,9 +32,9 @@ let advance_with_lexeme parser =
 let advance_if_kind kind parser =
   match peek_kind parser with
   | Some k when k = kind ->
-      let parser, _ = advance parser in
-      parser
-  | _ -> parser
+      let parser, token = advance parser in
+      (parser, Some token)
+  | _ -> (parser, None)
 
 (* If the next token has the given token kind, advance the current position.
    Otherwise, produce an error. *)
@@ -70,34 +70,71 @@ let parse_arms parse_arm parser =
     | _ -> (parser, end_offset, [])
   in
   (* The first pipe is optional. *)
-  let parser = advance_if_kind Token.Pipe parser in
+  let parser, _ = advance_if_kind Token.Pipe parser in
   let parser, end_offset, head_arm = parse_arm parser in
   let parser, end_offset, tail_arms = additional_arms end_offset parser in
   (parser, end_offset, head_arm :: tail_arms)
 
-(* type = IDENTIFIER | "[" type "]" *)
+(* type = simple_type | function_type *)
 let rec data_type parser =
-  Option.bind (peek_kind parser) (function
-    | Token.Identifier -> Some (identifier_data_type parser)
-    | Token.OpenSquare -> Some (list_data_type parser)
-    | _ -> None)
+  let rec additional_simple_types end_offset parser =
+    match simple_type parser with
+    | Some (parser, end_offset, head) ->
+        let parser, end_offset, tail =
+          additional_simple_types end_offset parser
+        in
+        (parser, end_offset, head :: tail)
+    | None -> (parser, end_offset, [])
+  in
+  (* Either map a simple type into a function type (if possible) or return as
+     is. *)
+  let maybe_into_function_type (parser, end_offset, head_type) =
+    let parser, end_offset, tail_types =
+      additional_simple_types end_offset parser
+    in
+    if List.is_empty tail_types && peek_kind parser <> Some Token.Arrow then
+      (parser, end_offset, head_type)
+    else
+      let parser, _ =
+        expect_kind Token.Arrow "Expected '->' in function type." parser
+      in
+      let parser, end_offset, return_head_type = expect_simple_type parser in
+      let parser, end_offset, return_tail_types =
+        additional_simple_types end_offset parser
+      in
+      let node =
+        Ast.DataType.Function
+          (head_type :: tail_types, return_head_type :: return_tail_types)
+      in
+      (parser, end_offset, node)
+  in
+  simple_type parser |> Option.map maybe_into_function_type
 
 and expect_data_type parser =
-  expect_or_syntax_error data_type "Expected a data type." parser
+  expect_or_syntax_error data_type "Expected a type." parser
 
-and identifier_data_type parser =
-  let parser, token, identifier = advance_with_lexeme parser in
-  (parser, token.position.end_offset, Ast.DataType.Identifier identifier)
+(* simple_type = [ "@" ] IDENTIFIER *)
+and simple_type parser =
+  let parser, at_token_opt = advance_if_kind Token.At parser in
+  if Option.is_some at_token_opt then
+    let parser, identifier_token, identifier =
+      expect_kind_with_lexeme Token.Identifier
+        "Expected an identifier for this location type." parser
+    in
+    let node = Ast.DataType.Location identifier in
+    Some (parser, identifier_token.position.end_offset, node)
+  else
+    Option.bind (peek_kind parser) (function
+      | Token.Identifier ->
+          let parser, identifier_token, identifier =
+            advance_with_lexeme parser
+          in
+          let node = Ast.DataType.Identifier identifier in
+          Some (parser, identifier_token.position.end_offset, node)
+      | _ -> None)
 
-and list_data_type parser =
-  (* Consume opening bracket. *)
-  let parser, _ = advance parser in
-  let parser, _, element_type = expect_data_type parser in
-  let parser, close_token =
-    expect_kind Token.CloseSquare "Expected list type to end with closing ']'."
-      parser
-  in
-  (parser, close_token.position.end_offset, Ast.DataType.List element_type)
+and expect_simple_type parser =
+  expect_or_syntax_error simple_type "Expected a simple type." parser
 
 (* pattern = IDENTIFIER | CAPITALISED_IDENTIFIER [ pattern ] *)
 let rec pattern parser =

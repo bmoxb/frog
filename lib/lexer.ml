@@ -94,6 +94,7 @@ let next_token_kind c lexer : (t * Token.kind, Err.t) result =
         |> conditionally_advance (( = ) '=') ~if_match:LessThanOrEqual
              ~otherwise:LessThan)
   | '|' -> Ok (lexer, Pipe)
+  | '@' -> Ok (lexer, At)
   | '"' -> handle_string lexer
   | c when is_digit c -> Ok (handle_number lexer)
   | c when is_identifier c -> Ok (handle_identifier lexer)

@@ -37,16 +37,32 @@ module Pattern = struct
 end
 
 module DataType = struct
-  type t = Identifier of identifier | List of t [@@deriving show]
+  type t =
+    | Identifier of identifier
+    | Location of identifier
+    | Function of t list * t list
+  [@@deriving show]
 
   let rec to_tree_vertex data_type =
     let label, edges =
       match data_type with
       | Identifier identifier ->
           ("identifier", [ Tree.edge (Tree.vertex identifier) ])
-      | List data_type ->
-          ( "list",
-            [ Tree.edge ~label:"element type" (to_tree_vertex data_type) ] )
+      | Location identifier ->
+          ("location", [ Tree.edge (Tree.vertex ("@" ^ identifier)) ])
+      | Function (inputs, outputs) ->
+          let data_type_to_edge data_type =
+            Tree.edge (to_tree_vertex data_type)
+          in
+          ( "function",
+            [
+              Tree.edge
+                (Tree.vertex "inputs"
+                   ~edges:(List.map data_type_to_edge inputs));
+              Tree.edge
+                (Tree.vertex "outputs"
+                   ~edges:(List.map data_type_to_edge outputs));
+            ] )
     in
     Tree.vertex ~colour:(Tree.rgb 1.0 0.1 0.1) ~edges label
 end
