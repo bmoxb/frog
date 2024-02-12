@@ -75,7 +75,7 @@ let parse_arms parse_arm parser =
   let parser, end_offset, tail_arms = additional_arms end_offset parser in
   (parser, end_offset, head_arm :: tail_arms)
 
-(* type = simple_type | function_type *)
+(* type = simple_type [ { simple_type } "->" simple_type { simple_type } ] *)
 let rec data_type parser =
   let rec additional_simple_types end_offset parser =
     match simple_type parser with
@@ -136,23 +136,31 @@ and simple_type parser =
 and expect_simple_type parser =
   expect_or_syntax_error simple_type "Expected a simple type." parser
 
-(* pattern = IDENTIFIER | CAPITALISED_IDENTIFIER [ pattern ] *)
+(* pattern = identifier_pattern | type_constructor_pattern | literal_pattern *)
 let rec pattern parser =
   Option.bind (peek_kind parser) (function
-    | Token.Identifier -> Some (identifier_pattern parser)
-    | Token.CapitalisedIdentifier -> Some (type_constructor_pattern parser)
+    | Identifier -> Some (identifier_pattern parser)
+    | CapitalisedIdentifier -> Some (type_constructor_pattern parser)
+    | NumberLiteral | StringLiteral -> Some (literal_pattern parser)
     | _ -> None)
 
+(* identifier_pattern = IDENTIFER *)
 and identifier_pattern parser =
   let parser, _, identifier = advance_with_lexeme parser in
   (parser, Ast.Pattern.Identifier identifier)
 
+(* type_constructor_pattern = CAPITALISED_IDENTIFIER [ pattern ] *)
 and type_constructor_pattern parser =
   let parser, _, identifier = advance_with_lexeme parser in
   match pattern parser with
   | Some (parser, argument) ->
       (parser, Ast.Pattern.TypeConstructor (identifier, Some argument))
   | None -> (parser, Ast.Pattern.TypeConstructor (identifier, None))
+
+(* literal_pattern = NUMBER | STRING *)
+and literal_pattern parser =
+  let parser, _, lexeme = advance_with_lexeme parser in
+  (parser, Ast.Pattern.Literal lexeme)
 
 let expect_pattern parser =
   expect_or_syntax_error pattern "Expected a pattern." parser
