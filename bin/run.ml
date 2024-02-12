@@ -1,16 +1,14 @@
 open Osaka
 
 let rec consume ~next obj =
-  Result.bind (next obj) (function
-    | Some (obj, head) ->
-        consume ~next obj |> Result.map (fun tail -> head :: tail)
-    | None -> Ok [])
+  next obj
+  |> Option.map (fun (obj, head) -> head :: consume ~next obj)
+  |> Option.value ~default:[]
 
-let get_tokens source_code =
-  consume ~next:Lexer.next_token (Lexer.init source_code)
+let get_tokens source_code = consume ~next:Lexer.token (Lexer.init source_code)
 
 let get_ast source_code tokens =
-  consume ~next:Parser.next_ast (Parser.init source_code tokens)
+  consume ~next:Parser.top_level (Parser.init source_code tokens)
 
 let debug_tokens path tokens =
   if path <> "" then
@@ -19,11 +17,17 @@ let debug_tokens path tokens =
         Out_channel.output_string chan text)
   else ()
 
-let debug_ast path expr =
+let debug_ast path ast =
+  let top_level_to_edge top_level = Tree.edge (Ast.to_tree_vertex top_level) in
   if path <> "" then
-    let text = expr |> Ast.to_tree |> Tree.to_dot in
+    let tree =
+      Tree.vertex
+        ~edges:(List.map top_level_to_edge ast)
+        "top-level definitions"
+      |> Tree.init
+    in
     Out_channel.with_open_text path (fun chan ->
-        Out_channel.output_string chan text)
+        Out_channel.output_string chan (Tree.to_dot tree))
   else ()
 
 let run input_path debug_tokens_path debug_ast_path =
@@ -33,16 +37,13 @@ let run input_path debug_tokens_path debug_ast_path =
       Printf.printf "Failed to read input file: %s\n" input_path;
       exit 0
   in
-  let tokens_result = get_tokens source_code in
   try
-    let ast_result =
-      Result.bind tokens_result (fun tokens ->
-          debug_tokens debug_tokens_path tokens;
-          get_ast source_code tokens)
-    in
-    match ast_result with
-    | Ok ast ->
-        debug_ast debug_ast_path (List.hd ast);
-        ast |> List.iter (fun node -> Ast.show node |> print_endline)
-    | Error err -> Err.display input_path source_code err |> print_endline
-  with _ -> print_endline "Failed to write debug output files."
+    let tokens = get_tokens source_code in
+    debug_tokens debug_tokens_path tokens;
+    let ast = get_ast source_code tokens in
+    debug_ast debug_ast_path ast;
+    ast |> List.iter (fun node -> Ast.show node |> print_endline)
+  with
+  | Err.Exception err ->
+      print_endline (Err.display ~filename:input_path ~source_code err)
+  | Sys_error _ -> print_endline "Failed to write output files."

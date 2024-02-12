@@ -1,17 +1,15 @@
 open Osaka
 open OUnit2
 
-let assert_valid_token expected_token output =
-  match output with
-  | Ok (Some (lexer, token)) ->
+let assert_valid_token expected_token = function
+  | Some (lexer, token) ->
       assert_equal expected_token token ~printer:Token.show;
       lexer
-  | Ok None -> assert_failure "Unexpected end of token stream."
-  | Error _ -> assert_failure "Function next_token gave unexpected error."
+  | None -> assert_failure "Unexpected end of token stream."
 
 let test_valid_token name input expected_token =
   name >:: fun _ ->
-  let output = input |> Lexer.init |> Lexer.next_token in
+  let output = input |> Lexer.init |> Lexer.token in
   let _ = assert_valid_token expected_token output in
   ()
 
@@ -53,7 +51,7 @@ let test_valid_token_stream name input expected_tokens =
   let rec assert_tokens expected_tokens lexer =
     match expected_tokens with
     | expected_token :: tail ->
-        let output = Lexer.next_token lexer in
+        let output = Lexer.token lexer in
         let lexer = assert_valid_token expected_token output in
         assert_tokens tail lexer
     | [] -> ()

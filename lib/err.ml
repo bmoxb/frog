@@ -1,10 +1,18 @@
-(** Errors in an Osaka program (lexical, syntax, etc.) *)
-
 type lexical = { character : char; position : Position.t }
 
 type syntax = { token : Token.t; msg : string }
 
 type t = UnexpectedEOF | Lexical of lexical | Syntax of syntax
+
+exception Exception of t
+
+let raise_lexical_error character position =
+  raise_notrace (Exception (Lexical { character; position }))
+
+let raise_syntax_error token msg =
+  raise_notrace (Exception (Syntax { token; msg }))
+
+let raise_unexpected_eof () = raise_notrace (Exception UnexpectedEOF)
 
 let bold_red_colour = "\027[1;31m"
 
@@ -41,7 +49,7 @@ let display_relevant_lines source_code (specific_position : Position.specific) =
   in
   lines_text ^ "\n" ^ arrows
 
-let display filename source_code err =
+let display ~filename ~source_code err =
   let open Printf in
   let kind, msg, (position : Position.t) =
     match err with

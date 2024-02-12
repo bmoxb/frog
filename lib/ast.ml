@@ -292,6 +292,3 @@ let to_tree_vertex node =
           :: List.mapi data_arm_to_edge arms )
   in
   Tree.vertex ~colour:(Tree.rgb 0.2 0.2 0.2) ~edges label
-
-let to_tree node =
-  Tree.init ~horizontal_spacing:1.0 ~vertical_spacing:1.0 (to_tree_vertex node)

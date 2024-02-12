@@ -2,13 +2,6 @@ type t = { source_code : string; tokens : Token.t list }
 
 let init source_code tokens = { source_code; tokens }
 
-(* Exception used to conveniently send syntax errors up the call stack. Must
-   not leak to the module's public interface. *)
-exception ErrException of Err.t
-
-let raise_syntax_error token msg =
-  raise_notrace (ErrException (Err.Syntax { token; msg }))
-
 (* See the token kind of the next token without changing the current position
    in the token stream. *)
 let peek_kind parser =
@@ -19,7 +12,7 @@ let peek_kind parser =
 let advance parser =
   match parser.tokens with
   | token :: tail -> ({ parser with tokens = tail }, token)
-  | [] -> raise_notrace (ErrException Err.UnexpectedEOF)
+  | [] -> Err.raise_unexpected_eof ()
 
 (* If the peeked token has the given kind, advance. Otherwise, do nothing. This
    is used to consume optional tokens. *)
@@ -35,16 +28,16 @@ let advance_if_kind kind parser =
 let expect_kind kind error_msg parser =
   let parser, token = advance parser in
   if token.kind = kind then (parser, token)
-  else raise_syntax_error token error_msg
+  else Err.raise_syntax_error token error_msg
 
 (* Call the given syntax rule function and if some unwrap and return the
    result. If none then just produce a syntax error. *)
-let expect_or_syntax_error rule msg parser =
+let expect_or_syntax_error rule error_msg parser =
   match rule parser with
   | Some result -> result
   | None ->
       let _, token = advance parser in
-      raise_syntax_error token msg
+      Err.raise_syntax_error token error_msg
 
 (* Helper function for parsing match and data arms. *)
 let parse_arms parse_arm parser =
@@ -486,7 +479,5 @@ let top_level parser =
         in
         raise_syntax_error unexpected_token msg
   in
-  peek_kind parser |> Option.map match_kind
-
-let next_ast parser =
-  try Ok (top_level parser) with ErrException err -> Error err
+  try Ok (peek_kind parser |> Option.map match_kind)
+  with ErrException err -> Error err
