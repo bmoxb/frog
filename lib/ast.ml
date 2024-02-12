@@ -3,7 +3,9 @@
 type identifier = string [@@deriving show]
 
 module Pattern = struct
-  type t =
+  type t = { position : Position.t; kind : kind }
+
+  and kind =
     | Identifier of identifier
     | TypeConstructor of identifier * t option
     | Literal of string
@@ -11,7 +13,7 @@ module Pattern = struct
 
   let rec to_tree_vertex pattern =
     let label, edges =
-      match pattern with
+      match pattern.kind with
       | Identifier identifier ->
           ("identifier", [ Tree.edge (Tree.vertex identifier) ])
       | TypeConstructor (identifier, pattern_opt) ->
@@ -37,7 +39,9 @@ module Pattern = struct
 end
 
 module DataType = struct
-  type t =
+  type t = { position : Position.t; kind : kind }
+
+  and kind =
     | Identifier of identifier
     | Location of identifier
     | Function of t list * t list
@@ -45,7 +49,7 @@ module DataType = struct
 
   let rec to_tree_vertex data_type =
     let label, edges =
-      match data_type with
+      match data_type.kind with
       | Identifier identifier ->
           ("identifier", [ Tree.edge (Tree.vertex identifier) ])
       | Location identifier ->
@@ -139,7 +143,7 @@ module Expr = struct
 
   and kind =
     (* "let" pattern { pattern } ":" type "=" expr "in" expr *)
-    | LetIn of Pattern.t list * DataType.t * t * t
+    | LetIn of Pattern.t * Pattern.t list * DataType.t * t * t
     (* "match" expr "with" [ "|" ] match_arm { "|" match_arm } *)
     | Match of t * match_arm list
     (* "if" expr "then" expr "else" expr *)
@@ -161,9 +165,9 @@ module Expr = struct
   let rec to_tree_vertex expr =
     let label, edges =
       match expr.kind with
-      | LetIn (patterns, data_type, bound_expr, body_expr) ->
+      | LetIn (pattern, patterns, data_type, bound_expr, body_expr) ->
           ( "let-in",
-            List.mapi Pattern.to_indexed_tree_edge patterns
+            List.mapi Pattern.to_indexed_tree_edge (pattern :: patterns)
             @ [
                 Tree.edge ~label:"type" (DataType.to_tree_vertex data_type);
                 Tree.edge ~label:"bound expr" (to_tree_vertex bound_expr);
@@ -230,10 +234,6 @@ module Expr = struct
              Tree.edge ~label:"expr" (to_tree_vertex expr);
            ]
          (Printf.sprintf "arm %d" index))
-
-  let to_tree expr =
-    Tree.init ~horizontal_spacing:1.0 ~vertical_spacing:1.0
-      (to_tree_vertex expr)
 end
 
 (* IDENTFIER [ type ] *)
@@ -259,7 +259,7 @@ let data_arm_to_edge index (constructor_identifier, data_type_opt) =
 
 type kind =
   (* "let" pattern { pattern } ":" type "=" expr *)
-  | Let of Pattern.t list * DataType.t * Expr.t
+  | Let of Pattern.t * Pattern.t list * DataType.t * Expr.t
   (* "alias" IDENTIFIER "=" type *)
   | Alias of identifier * DataType.t
   (* "data" IDENTIFIER "=" [ "|" ] data_arm { "|" data_arm } *)
@@ -273,9 +273,9 @@ type t = { position : Position.t; kind : kind } [@@deriving show]
 let to_tree_vertex node =
   let label, edges =
     match node.kind with
-    | Let (patterns, data_type, expr) ->
+    | Let (pattern, patterns, data_type, expr) ->
         ( "let",
-          List.mapi Pattern.to_indexed_tree_edge patterns
+          List.mapi Pattern.to_indexed_tree_edge (pattern :: patterns)
           @ [
               Tree.edge ~label:"type" (DataType.to_tree_vertex data_type);
               Tree.edge ~label:"expr" (Expr.to_tree_vertex expr);
