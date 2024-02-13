@@ -3,7 +3,7 @@
 type identifier = string [@@deriving show]
 
 module Pattern = struct
-  type t = { position : Position.t; kind : kind }
+  type t = { pos : Position.t; kind : kind }
 
   and kind =
     | Identifier of identifier
@@ -39,7 +39,7 @@ module Pattern = struct
 end
 
 module DataType = struct
-  type t = { position : Position.t; kind : kind }
+  type t = { pos : Position.t; kind : kind }
 
   and kind =
     | Identifier of identifier
@@ -139,7 +139,7 @@ module Expr = struct
     | StringLiteral -> "string literal"
     | Identifier -> "identifier"
 
-  type t = { position : Position.t; kind : kind } [@@deriving show]
+  type t = { pos : Position.t; kind : kind } [@@deriving show]
 
   and kind =
     (* "let" pattern { pattern } ":" type "=" expr "in" expr *)
@@ -266,7 +266,7 @@ type kind =
   | Data of identifier * data_arm list
 [@@deriving show]
 
-type t = { position : Position.t; kind : kind } [@@deriving show]
+type t = { pos : Position.t; kind : kind } [@@deriving show]
 (** A top-level definition. A program is comprised of one or more top-level
     definitions meaning a program's full AST is represented by a list of t. *)
 

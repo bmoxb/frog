@@ -10,7 +10,7 @@ let tests =
   "position"
   >::: [
          test_determine_specific_position "single line" ~source:"abcdef"
-           ~position:{ start_offset = 2; end_offset = 5 }
+           ~position:{ start = 2; finish = 5 }
            ~expected:
              {
                start_line_number = 1;
@@ -22,7 +22,7 @@ let tests =
              };
          test_determine_specific_position "multiple lines"
            ~source:"line 1\nline 2\nline 3\nline 4"
-           ~position:{ start_offset = 7; end_offset = 20 }
+           ~position:{ start = 7; finish = 20 }
            ~expected:
              {
                start_line_number = 2;

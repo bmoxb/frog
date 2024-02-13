@@ -85,13 +85,12 @@ let rec data_type parser =
       let parser, last_return_opt, return_tail =
         any_number_of simple_type parser
       in
-      let end_offset =
-        (last_return_opt |> Option.value ~default:return_head).position
-          .end_offset
+      let finish =
+        (last_return_opt |> Option.value ~default:return_head).pos.finish
       in
       let node : Ast.DataType.t =
         {
-          position = { start_offset = head.position.start_offset; end_offset };
+          pos = { start = head.pos.start; finish };
           kind = Ast.DataType.Function (head :: tail, return_head :: return_tail);
         }
       in
@@ -114,11 +113,8 @@ and simple_type parser =
       let identifier = Token.lexeme parser.source_code identifier_token in
       let node : Ast.DataType.t =
         {
-          position =
-            {
-              start_offset = at_token.position.start_offset;
-              end_offset = identifier_token.position.end_offset;
-            };
+          pos =
+            { start = at_token.pos.start; finish = identifier_token.pos.finish };
           kind = Ast.DataType.Location identifier;
         }
       in
@@ -127,7 +123,7 @@ and simple_type parser =
       let parser, token = advance parser in
       let identifier = Token.lexeme parser.source_code token in
       let node : Ast.DataType.t =
-        { position = token.position; kind = Ast.DataType.Identifier identifier }
+        { pos = token.pos; kind = Ast.DataType.Identifier identifier }
       in
       Some (parser, node)
   | _ -> None
@@ -148,7 +144,7 @@ and identifier_pattern parser =
   let parser, token = advance parser in
   let identifier = Token.lexeme parser.source_code token in
   let node : Ast.Pattern.t =
-    { position = token.position; kind = Ast.Pattern.Identifier identifier }
+    { pos = token.pos; kind = Ast.Pattern.Identifier identifier }
   in
   (parser, node)
 
@@ -160,11 +156,7 @@ and type_constructor_pattern parser =
   | Some (parser, argument) ->
       let node : Ast.Pattern.t =
         {
-          position =
-            {
-              start_offset = token.position.start_offset;
-              end_offset = argument.position.end_offset;
-            };
+          pos = { start = token.pos.start; finish = argument.pos.finish };
           kind = Ast.Pattern.TypeConstructor (identifier, Some argument);
         }
       in
@@ -172,7 +164,7 @@ and type_constructor_pattern parser =
   | None ->
       let node : Ast.Pattern.t =
         {
-          position = token.position;
+          pos = token.pos;
           kind = Ast.Pattern.TypeConstructor (identifier, None);
         }
       in
@@ -182,7 +174,7 @@ and type_constructor_pattern parser =
 and literal_pattern parser =
   let parser, token = advance parser in
   let literal = Token.lexeme parser.source_code token in
-  (parser, { position = token.position; kind = Ast.Pattern.Literal literal })
+  (parser, { pos = token.pos; kind = Ast.Pattern.Literal literal })
 
 let expect_pattern parser =
   expect_or_syntax_error pattern "Expected a pattern." parser
@@ -197,14 +189,12 @@ let rec expr parser =
 
 (* let_in = let "in" expr *)
 and let_in parser : t * Ast.Expr.t =
-  let parser, start_offset, patterns, data_type, bound_expr =
-    parse_let parser
-  in
+  let parser, start, patterns, data_type, bound_expr = parse_let parser in
   let parser, _ = expect_kind InKeyword "Expected 'in' keyword." parser in
   let parser, body_expr = expr parser in
   let node : Ast.Expr.t =
     {
-      position = { start_offset; end_offset = body_expr.position.end_offset };
+      pos = { start; finish = body_expr.pos.finish };
       kind = Ast.Expr.LetIn (patterns, data_type, bound_expr, body_expr);
     }
   in
@@ -219,14 +209,10 @@ and match_with parser =
       "Expected 'then' keyword after condition in match expression." parser
   in
   let parser, last_arm, arms = parse_arms match_arm parser in
-  let (last_arm_position : Position.t), _, _ = last_arm in
+  let (last_arm_pos : Position.t), _, _ = last_arm in
   let node : Ast.Expr.t =
     {
-      position =
-        {
-          start_offset = match_token.position.start_offset;
-          end_offset = last_arm_position.end_offset;
-        };
+      pos = { start = match_token.pos.start; finish = last_arm_pos.finish };
       kind = Ast.Expr.Match (condition, arms);
     }
   in
@@ -240,13 +226,10 @@ and match_arm parser =
       "Expected an arrow '->' token after pattern in match arm." parser
   in
   let parser, body = expr parser in
-  let position : Position.t =
-    {
-      start_offset = pattern.position.start_offset;
-      end_offset = body.position.end_offset;
-    }
+  let pos : Position.t =
+    { start = pattern.pos.start; finish = body.pos.finish }
   in
-  let arm = (position, pattern, body) in
+  let arm = (pos, pattern, body) in
   (parser, arm)
 
 (* if_then_else = "if" expr "then" expr "else" expr *)
@@ -266,11 +249,7 @@ and if_then_else parser =
   let parser, else_expr = expr parser in
   let node : Ast.Expr.t =
     {
-      position =
-        {
-          start_offset = if_token.position.start_offset;
-          end_offset = else_expr.position.end_offset;
-        };
+      pos = { start = if_token.pos.start; finish = else_expr.pos.finish };
       kind = Ast.Expr.IfThenElse (condition, then_expr, else_expr);
     }
   in
@@ -321,11 +300,7 @@ and unary parser =
       let parser, expr = unary parser in
       let node : Ast.Expr.t =
         {
-          position =
-            {
-              start_offset = op_token.position.start_offset;
-              end_offset = expr.position.end_offset;
-            };
+          pos = { start = op_token.pos.start; finish = expr.pos.finish };
           kind = Ast.Expr.UnaryOp (op, expr);
         }
       in
@@ -336,15 +311,12 @@ and unary parser =
 and application parser =
   let parser, (head_expr : Ast.Expr.t) = expect_primary parser in
   let parser, last_expr_opt, tail_exprs = any_number_of primary parser in
-  let end_offset =
-    (last_expr_opt |> Option.value ~default:head_expr).position.end_offset
-  in
+  let finish = (last_expr_opt |> Option.value ~default:head_expr).pos.finish in
   if List.is_empty tail_exprs then (parser, head_expr)
   else
     let node : Ast.Expr.t =
       {
-        position =
-          { start_offset = head_expr.position.start_offset; end_offset };
+        pos = { start = head_expr.pos.start; finish };
         kind = Ast.Expr.Application (head_expr, tail_exprs);
       }
     in
@@ -357,10 +329,7 @@ and primary parser =
       let parser, token = advance parser in
       let literal = Token.lexeme parser.source_code token in
       let node : Ast.Expr.t =
-        {
-          position = token.position;
-          kind = Ast.Expr.Primary (primary_kind, literal);
-        }
+        { pos = token.pos; kind = Ast.Expr.Primary (primary_kind, literal) }
       in
       Some (parser, node)
   | None -> grouping parser
@@ -379,11 +348,8 @@ and grouping parser =
       in
       let node : Ast.Expr.t =
         {
-          position =
-            {
-              start_offset = open_token.position.start_offset;
-              end_offset = close_token.position.end_offset;
-            };
+          pos =
+            { start = open_token.pos.start; finish = close_token.pos.finish };
           kind = Ast.Expr.Grouping expr;
         }
       in
@@ -403,11 +369,7 @@ and left_associative_binary_expr parser child_expr is_wanted_op =
       in
       let node : Ast.Expr.t =
         {
-          position =
-            {
-              start_offset = left_expr.position.start_offset;
-              end_offset = right_expr.position.end_offset;
-            };
+          pos = { start = left_expr.pos.start; finish = right_expr.pos.finish };
           kind = Ast.Expr.BinOp (op, left_expr, right_expr);
         }
       in
@@ -428,19 +390,17 @@ and parse_let parser =
   let parser, _ = expect_kind Token.Equals "Expected '=' token." parser in
   let parser, bound_expr = expr parser in
   ( parser,
-    let_token.position.start_offset,
+    let_token.pos.start,
     head_pattern :: tail_patterns,
     data_type,
     bound_expr )
 
 (* let = "let" pattern { pattern } ":" type "=" expr *)
 let let_binding parser =
-  let parser, start_offset, patterns, data_type, bound_expr =
-    parse_let parser
-  in
+  let parser, start, patterns, data_type, bound_expr = parse_let parser in
   let node : Ast.t =
     {
-      position = { start_offset; end_offset = bound_expr.position.end_offset };
+      pos = { start; finish = bound_expr.pos.finish };
       kind = Ast.Let (patterns, data_type, bound_expr);
     }
   in
@@ -458,11 +418,7 @@ let type_alias parser =
   let parser, data_type = expect_data_type parser in
   let node : Ast.t =
     {
-      position =
-        {
-          start_offset = alias_token.position.start_offset;
-          end_offset = data_type.position.end_offset;
-        };
+      pos = { start = alias_token.pos.start; finish = data_type.pos.finish };
       kind = Ast.Alias (identifier, data_type);
     }
   in
@@ -477,14 +433,11 @@ let data_arm parser =
   let identifier = Token.lexeme parser.source_code token in
   match data_type parser with
   | Some (parser, data_type) ->
-      let (position : Position.t) =
-        {
-          start_offset = token.position.start_offset;
-          end_offset = data_type.position.end_offset;
-        }
+      let (pos : Position.t) =
+        { start = token.pos.start; finish = data_type.pos.finish }
       in
-      (parser, (position, identifier, Some data_type))
-  | None -> (parser, (token.position, identifier, None))
+      (parser, (pos, identifier, Some data_type))
+  | None -> (parser, (token.pos, identifier, None))
 
 (* data = "data" IDENTIFIER "=" [ "|" ] data_arm { "|" data_arm } *)
 let data_definition parser =
@@ -496,14 +449,10 @@ let data_definition parser =
   let identifier = Token.lexeme parser.source_code identifier_token in
   let parser, _ = expect_kind Token.Equals "Expected '=' token." parser in
   let parser, last_arm, arms = parse_arms data_arm parser in
-  let last_arm_position, _, _ = last_arm in
+  let last_arm_pos, _, _ = last_arm in
   let node : Ast.t =
     {
-      position =
-        {
-          start_offset = data_token.position.start_offset;
-          end_offset = last_arm_position.end_offset;
-        };
+      pos = { start = data_token.pos.start; finish = last_arm_pos.finish };
       kind = Ast.Data (identifier, arms);
     }
   in

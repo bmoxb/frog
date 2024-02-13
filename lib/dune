@@ -1,3 +1,4 @@
 (library
  (name osaka)
- (preprocess (pps ppx_deriving.show)))
+ (preprocess
+  (pps ppx_deriving.show)))

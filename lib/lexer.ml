@@ -1,7 +1,6 @@
-type t = { source_code : string; position : Position.t }
+type t = { source_code : string; pos : Position.t }
 
-let init source_code =
-  { source_code; position = { start_offset = 0; end_offset = 0 } }
+let init source_code = { source_code; pos = { start = 0; finish = 0 } }
 
 let is_identifier = function
   | 'a' .. 'z' | 'A' .. 'Z' | '0' .. '9' | '_' -> true
@@ -14,17 +13,13 @@ let is_whitespace = function ' ' | '\n' | '\t' -> true | _ -> false
 (* Get the next character in the input stream without incrementing the current
    position in the stream. *)
 let peek lexer =
-  if lexer.position.end_offset < String.length lexer.source_code then
-    Some lexer.source_code.[lexer.position.end_offset]
+  if lexer.pos.finish < String.length lexer.source_code then
+    Some lexer.source_code.[lexer.pos.finish]
   else None
 
 (* Increment the current position in the input stream. *)
 let advance lexer =
-  {
-    lexer with
-    position =
-      { lexer.position with end_offset = lexer.position.end_offset + 1 };
-  }
+  { lexer with pos = { lexer.pos with finish = lexer.pos.finish + 1 } }
 
 let conditionally_advance cond ~if_match ~otherwise lexer =
   match peek lexer with
@@ -50,7 +45,7 @@ let rec handle_identifier lexer =
   | Some peeked when is_identifier peeked ->
       lexer |> advance |> handle_identifier
   | _ ->
-      let lexeme = Position.substring lexer.source_code lexer.position in
+      let lexeme = Position.substring lexer.source_code lexer.pos in
       (lexer, Token.lookup_identifier_or_keyword lexeme)
 
 let token_kind c lexer =
@@ -93,7 +88,7 @@ let token_kind c lexer =
   | '"' -> handle_string lexer
   | c when is_digit c -> handle_number lexer
   | c when is_identifier c -> handle_identifier lexer
-  | _ -> Err.raise_lexical_error c lexer.position
+  | _ -> Err.raise_lexical_error c lexer.pos
 
 (* Advance until the first non-whitespace character is found (or EOF). *)
 let rec skip_whitespace lexer =
@@ -103,13 +98,13 @@ let rec skip_whitespace lexer =
 
 (* Set the lexer's internal start position to the end position value. *)
 let reset_start_position lexer =
-  let offset = lexer.position.end_offset in
-  { lexer with position = { start_offset = offset; end_offset = offset } }
+  let offset = lexer.pos.finish in
+  { lexer with pos = { start = offset; finish = offset } }
 
 let token lexer =
   let lexer = lexer |> skip_whitespace |> reset_start_position in
   peek lexer
   |> Option.map (fun c ->
          let lexer, kind = token_kind c lexer in
-         let token : Token.t = { kind; position = lexer.position } in
+         let token : Token.t = { kind; pos = lexer.pos } in
          (lexer, token))

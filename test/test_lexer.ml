@@ -20,7 +20,7 @@ let test_valid_tokens name_prefix input_kind_pairs =
       let expected_token : Token.t =
         {
           kind = expected_kind;
-          position = { start_offset = 0; end_offset = String.length input };
+          pos = { start = 0; finish = String.length input };
         }
       in
       test_valid_token name input expected_token)
@@ -106,45 +106,21 @@ let tests =
        @ [
            test_valid_token_stream "repeated = signs" " ===== "
              [
-               {
-                 kind = Token.Equiv;
-                 position = { start_offset = 1; end_offset = 3 };
-               };
-               {
-                 kind = Token.Equiv;
-                 position = { start_offset = 3; end_offset = 5 };
-               };
-               {
-                 kind = Token.Equals;
-                 position = { start_offset = 5; end_offset = 6 };
-               };
+               { kind = Token.Equiv; pos = { start = 1; finish = 3 } };
+               { kind = Token.Equiv; pos = { start = 3; finish = 5 } };
+               { kind = Token.Equals; pos = { start = 5; finish = 6 } };
              ];
            test_valid_token_stream "dot before number literal" ".5\n5."
              [
-               {
-                 kind = Token.Dot;
-                 position = { start_offset = 0; end_offset = 1 };
-               };
-               {
-                 kind = Token.NumberLiteral;
-                 position = { start_offset = 1; end_offset = 2 };
-               };
-               {
-                 kind = Token.NumberLiteral;
-                 position = { start_offset = 3; end_offset = 5 };
-               };
+               { kind = Token.Dot; pos = { start = 0; finish = 1 } };
+               { kind = Token.NumberLiteral; pos = { start = 1; finish = 2 } };
+               { kind = Token.NumberLiteral; pos = { start = 3; finish = 5 } };
              ];
            test_valid_token_stream "multiple string literals"
              "\"abc\"\"def\nghi\""
              [
-               {
-                 kind = Token.StringLiteral;
-                 position = { start_offset = 0; end_offset = 5 };
-               };
-               {
-                 kind = Token.StringLiteral;
-                 position = { start_offset = 5; end_offset = 14 };
-               };
+               { kind = Token.StringLiteral; pos = { start = 0; finish = 5 } };
+               { kind = Token.StringLiteral; pos = { start = 5; finish = 14 } };
              ];
          ]
 
