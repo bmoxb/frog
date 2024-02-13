@@ -30,16 +30,28 @@ let expect_or_syntax_error rule error_msg parser =
       let _, token = advance parser in
       Err.raise_syntax_error token error_msg
 
+(* Parse using a rule any number (0 or more) times. Returns the last node (if
+    any) along with the list of all nodes. *)
+let any_number_of rule parser =
+  let rec traverse ~last parser =
+    match rule parser with
+    | Some (parser, head) ->
+        let parser, last, tail = traverse ~last parser in
+        (parser, last, head :: tail)
+    | None -> (parser, last, [])
+  in
+  traverse ~last:None parser
+
 (* Helper function for parsing match and data arms. *)
 let parse_arms parse_arm parser =
-  let rec additional_arms end_offset parser =
-    match peek_kind parser with
-    | Some Token.Pipe ->
-        let parser, _ = advance parser in
-        let parser, end_offset, arm = parse_arm parser in
-        let parser, end_offset, arms = additional_arms end_offset parser in
-        (parser, end_offset, arm :: arms)
-    | _ -> (parser, end_offset, [])
+  (* Parse an arm with a pipe '|' token required (so for all arms after the
+     first). *)
+  let parse_arm_with_pipe parser =
+    Option.bind (peek_kind parser) (function
+      | Pipe ->
+          let parser, _ = advance parser in
+          Some (parse_arm parser)
+      | _ -> None)
   in
   (* The first pipe is optional. *)
   let parser =
@@ -49,41 +61,38 @@ let parse_arms parse_arm parser =
         parser
     | _ -> parser
   in
-  let parser, end_offset, head_arm = parse_arm parser in
-  let parser, end_offset, tail_arms = additional_arms end_offset parser in
-  (parser, end_offset, head_arm :: tail_arms)
+  let parser, head_arm = parse_arm parser in
+  let parser, last_arm_opt, tail_arms =
+    any_number_of parse_arm_with_pipe parser
+  in
+  (parser, Option.value ~default:head_arm last_arm_opt, head_arm :: tail_arms)
 
 (* type = simple_type [ { simple_type } "->" simple_type { simple_type } ] *)
 let rec data_type parser =
-  let rec additional_simple_types parser =
-    match simple_type parser with
-    | Some (parser, head) ->
-        let parser, tail = additional_simple_types parser in
-        (parser, head :: tail)
-    | None -> (parser, [])
-  in
   (* Either map a simple type into a function type (if possible) or return as
      is. *)
-  let maybe_into_function_type (parser, (head_type : Ast.DataType.t)) =
-    let parser, tail_types = additional_simple_types parser in
+  let maybe_into_function_type (parser, (head : Ast.DataType.t)) =
+    let parser, _, tail = any_number_of simple_type parser in
     (* If there are no following simple types or a '->' token, then this must
        just be a single simple type rather than a function type. *)
-    if List.is_empty tail_types && peek_kind parser <> Some Token.Arrow then
-      (parser, head_type)
+    if List.is_empty tail && peek_kind parser <> Some Token.Arrow then
+      (parser, head)
     else
       let parser, _ =
         expect_kind Token.Arrow "Expected '->' in function type." parser
       in
-      let parser, return_head_type = expect_simple_type parser in
-      let parser, return_tail_types = additional_simple_types parser in
+      let parser, (return_head : Ast.DataType.t) = expect_simple_type parser in
+      let parser, last_return_opt, return_tail =
+        any_number_of simple_type parser
+      in
+      let end_offset =
+        (last_return_opt |> Option.value ~default:return_head).position
+          .end_offset
+      in
       let node : Ast.DataType.t =
         {
-          (* TODO: end *)
-          position =
-            { start_offset = head_type.position.start_offset; end_offset = 0 };
-          kind =
-            Ast.DataType.Function
-              (head_type :: tail_types, return_head_type :: return_tail_types);
+          position = { start_offset = head.position.start_offset; end_offset };
+          kind = Ast.DataType.Function (head :: tail, return_head :: return_tail);
         }
       in
       (parser, node)
@@ -209,11 +218,15 @@ and match_with parser =
     expect_kind Token.WithKeyword
       "Expected 'then' keyword after condition in match expression." parser
   in
-  let parser, end_offset, arms = parse_arms match_arm parser in
+  let parser, last_arm, arms = parse_arms match_arm parser in
+  let (last_arm_position : Position.t), _, _ = last_arm in
   let node : Ast.Expr.t =
     {
       position =
-        { start_offset = match_token.position.start_offset; end_offset };
+        {
+          start_offset = match_token.position.start_offset;
+          end_offset = last_arm_position.end_offset;
+        };
       kind = Ast.Expr.Match (condition, arms);
     }
   in
@@ -227,8 +240,14 @@ and match_arm parser =
       "Expected an arrow '->' token after pattern in match arm." parser
   in
   let parser, body = expr parser in
-  let arm = (pattern, body) in
-  (parser, body.position.end_offset, arm)
+  let position : Position.t =
+    {
+      start_offset = pattern.position.start_offset;
+      end_offset = body.position.end_offset;
+    }
+  in
+  let arm = (position, pattern, body) in
+  (parser, arm)
 
 (* if_then_else = "if" expr "then" expr "else" expr *)
 and if_then_else parser =
@@ -315,17 +334,11 @@ and unary parser =
 
 (* application = primary primary { primary } *)
 and application parser =
-  let rec additional_primary_exprs ?(end_offset = 0) parser =
-    match primary parser with
-    | Some (parser, (expr : Ast.Expr.t)) ->
-        let parser, end_offset, exprs =
-          additional_primary_exprs ~end_offset:expr.position.end_offset parser
-        in
-        (parser, end_offset, expr :: exprs)
-    | None -> (parser, end_offset, [])
-  in
   let parser, (head_expr : Ast.Expr.t) = expect_primary parser in
-  let parser, end_offset, tail_exprs = additional_primary_exprs parser in
+  let parser, last_expr_opt, tail_exprs = any_number_of primary parser in
+  let end_offset =
+    (last_expr_opt |> Option.value ~default:head_expr).position.end_offset
+  in
   if List.is_empty tail_exprs then (parser, head_expr)
   else
     let node : Ast.Expr.t =
@@ -404,16 +417,9 @@ and left_associative_binary_expr parser child_expr is_wanted_op =
 (* Helper function for parsing a top-level let definition or the first part of
    a let-in expression. *)
 and parse_let parser =
-  let rec additional_patterns parser =
-    match pattern parser with
-    | Some (parser, pattern) ->
-        let parser, tail = additional_patterns parser in
-        (parser, pattern :: tail)
-    | None -> (parser, [])
-  in
   let parser, let_token = advance parser in
   let parser, head_pattern = expect_pattern parser in
-  let parser, tail_patterns = additional_patterns parser in
+  let parser, _, tail_patterns = any_number_of pattern parser in
   let parser, _ =
     expect_kind Token.Colon
       "Expected ':' token and a type for the binding being introduced." parser
@@ -471,8 +477,14 @@ let data_arm parser =
   let identifier = Token.lexeme parser.source_code token in
   match data_type parser with
   | Some (parser, data_type) ->
-      (parser, data_type.position.end_offset, (identifier, Some data_type))
-  | None -> (parser, token.position.end_offset, (identifier, None))
+      let (position : Position.t) =
+        {
+          start_offset = token.position.start_offset;
+          end_offset = data_type.position.end_offset;
+        }
+      in
+      (parser, (position, identifier, Some data_type))
+  | None -> (parser, (token.position, identifier, None))
 
 (* data = "data" IDENTIFIER "=" [ "|" ] data_arm { "|" data_arm } *)
 let data_definition parser =
@@ -483,10 +495,15 @@ let data_definition parser =
   in
   let identifier = Token.lexeme parser.source_code identifier_token in
   let parser, _ = expect_kind Token.Equals "Expected '=' token." parser in
-  let parser, end_offset, arms = parse_arms data_arm parser in
+  let parser, last_arm, arms = parse_arms data_arm parser in
+  let last_arm_position, _, _ = last_arm in
   let node : Ast.t =
     {
-      position = { start_offset = data_token.position.start_offset; end_offset };
+      position =
+        {
+          start_offset = data_token.position.start_offset;
+          end_offset = last_arm_position.end_offset;
+        };
       kind = Ast.Data (identifier, arms);
     }
   in

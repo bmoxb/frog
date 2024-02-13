@@ -160,7 +160,7 @@ module Expr = struct
   [@@deriving show]
 
   (* pattern "->" expr *)
-  and match_arm = Pattern.t * t [@@deriving show]
+  and match_arm = Position.t * Pattern.t * t [@@deriving show]
 
   let rec to_tree_vertex expr =
     let label, edges =
@@ -225,7 +225,7 @@ module Expr = struct
     in
     Tree.vertex ~colour:(Tree.rgb 0.1 0.1 1.0) ~edges label
 
-  and match_arm_to_edge index (pattern, expr) =
+  and match_arm_to_edge index (_, pattern, expr) =
     Tree.edge
       (Tree.vertex
          ~edges:
@@ -237,9 +237,9 @@ module Expr = struct
 end
 
 (* IDENTFIER [ type ] *)
-type data_arm = identifier * DataType.t option [@@deriving show]
+type data_arm = Position.t * identifier * DataType.t option [@@deriving show]
 
-let data_arm_to_edge index (constructor_identifier, data_type_opt) =
+let data_arm_to_edge index (_, constructor_identifier, data_type_opt) =
   let constructor_edge =
     Tree.edge ~label:"constructor identifier"
       (Tree.vertex constructor_identifier)
