@@ -2,9 +2,13 @@
 
 type variable = string [@@deriving show]
 
-type location = string option [@@deriving show]
+type location = Lambda | Location of string [@@deriving show]
 
-type jump = string option [@@deriving show]
+let display_location = function Lambda -> "" | Location a -> a
+
+type jump = Star | Jump of string [@@deriving show]
+
+let display_jump = function Star -> "*" | Jump j -> j
 
 (**
  * Term of the Functional Machine Calculus augmented with jumps.
@@ -18,47 +22,24 @@ type t =
   | Jump of jump
   (* Application / Push Action
    * [N]a.M *)
-  | Application of { arg : t; location : location; func : t }
+  | Push of t * location * t
   (* Abstraction / Pop Action
    * a<x>.M *)
-  | Abstraction of { location : location; variable : variable; term : t }
+  | Pop of location * variable * t
   (* N; j -> M *)
-  | Condition of { condition : t; jump : jump; body : t }
+  | Choice of t * jump * t
   (* M^j *)
-  | Loop of { term : t; jump : jump }
+  | Loop of t * jump
 [@@deriving show]
 
 let rec display =
   let open Printf in
-  let display_cont = function
-    | Condition _ as term -> sprintf "(%s)" (display term)
-    | term -> display term
-  in
-  let display_end = function
-    | Jump None -> ""
-    | term -> "." ^ display_cont term
-  in
-  let display_loop = function
-    | Jump None -> "*"
-    | Jump (Some x) | Variable x -> x
-    | term -> sprintf "(%s)" (display term)
-  in
   function
   | Variable var -> var
-  | Jump None -> "*"
-  | Jump (Some j) -> j
-  | Application { arg; location; func } ->
-      sprintf "[%s]%s%s" (display arg)
-        (Option.value location ~default:"")
-        (display_end func)
-  | Abstraction { location; variable; term } ->
-      sprintf "%s<%s>%s"
-        (Option.value location ~default:"")
-        variable (display_end term)
-  | Condition { condition; jump; body } ->
-      sprintf "%s; %s%s" (display condition)
-        (jump |> Option.map (sprintf "%s -> ") |> Option.value ~default:"")
-        (display_cont body)
-  | Loop { term; jump } ->
-      display_loop term
-      ^ (jump |> Option.map (sprintf "^%s") |> Option.value ~default:"*")
+  | Jump j -> display_jump j
+  | Push (n, a, m) ->
+      sprintf "[%s]%s.%s" (display n) (display_location a) (display m)
+  | Pop (a, x, m) -> sprintf "%s<%s>.%s" (display_location a) x (display m)
+  | Choice (n, Star, m) -> sprintf "%s; %s" (display n) (display m)
+  | Choice (n, Jump j, m) -> sprintf "%s; %s -> %s" (display n) j (display m)
+  | Loop (m, j) -> sprintf "%s^%s" (show m) (display_jump j)
