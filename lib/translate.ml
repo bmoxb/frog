@@ -14,7 +14,7 @@ let translate_expr expr =
     let op_var = Variable (display_binary_operator op) in
     match (lhs.kind, rhs.kind) with
     | Primary (_, lhs), Primary (_, rhs) ->
-        Push (Variable lhs, Lambda, Push (Variable rhs, Lambda, op_var))
+        Push (Variable rhs, Lambda, Push (Variable lhs, Lambda, op_var))
     | expr, Primary (_, primary) ->
         Choice (traverse expr, Star, Push (Variable primary, Lambda, op_var))
     | Primary (_, primary), expr ->

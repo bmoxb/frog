@@ -1,15 +1,5 @@
 open Osaka
 
-let rec consume ~next obj =
-  next obj
-  |> Option.map (fun (obj, head) -> head :: consume ~next obj)
-  |> Option.value ~default:[]
-
-let get_tokens source_code = consume ~next:Lexer.token (Lexer.init source_code)
-
-let get_ast source_code tokens =
-  consume ~next:Parser.top_level (Parser.init source_code tokens)
-
 let debug_tokens path tokens =
   if path <> "" then
     let text = tokens |> List.map Token.show |> String.concat "\n" in
@@ -38,9 +28,9 @@ let run input_path debug_tokens_path debug_ast_path =
       exit 0
   in
   try
-    let tokens = get_tokens source_code in
+    let tokens = Consume.get_tokens source_code in
     debug_tokens debug_tokens_path tokens;
-    let ast = get_ast source_code tokens in
+    let ast = Consume.get_ast source_code tokens in
     debug_ast debug_ast_path ast;
     ast |> List.iter (fun node -> Ast.show node |> print_endline)
   with

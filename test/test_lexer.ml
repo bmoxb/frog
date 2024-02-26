@@ -13,9 +13,8 @@ let test_valid_token name input expected_token =
   let _ = assert_valid_token expected_token output in
   ()
 
-let test_valid_tokens name_prefix input_kind_pairs =
-  List.map
-    (fun (input, expected_kind) ->
+let test_valid_tokens name_prefix =
+  List.map (fun (input, expected_kind) ->
       let name = name_prefix ^ ": " ^ input in
       let expected_token : Token.t =
         {
@@ -24,7 +23,6 @@ let test_valid_tokens name_prefix input_kind_pairs =
         }
       in
       test_valid_token name input expected_token)
-    input_kind_pairs
 
 let test_valid_simple_tokens = test_valid_tokens "simple token"
 
