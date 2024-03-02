@@ -16,12 +16,13 @@ let translate_expr expr =
     | Primary (_, lhs), Primary (_, rhs) ->
         Push (Variable rhs, Lambda, Push (Variable lhs, Lambda, op_var))
     | expr, Primary (_, primary) ->
-        Choice (traverse expr, Star, Push (Variable primary, Lambda, op_var))
-    | Primary (_, primary), expr ->
         Choice (Push (Variable primary, Lambda, traverse expr), Star, op_var)
+    | Primary (_, primary), expr ->
+        Choice (traverse expr, Star, Push (Variable primary, Lambda, op_var))
     | lhs, rhs ->
-        Choice (traverse lhs, Star, Choice (traverse rhs, Star, op_var))
+        Choice (traverse rhs, Star, Choice (traverse lhs, Star, op_var))
   in
   traverse expr.kind
 
-let translate _ = exit 0
+let translate (node : Ast.t) =
+  match node.kind with Let (_, _, expr) -> translate_expr expr | _ -> exit 0
