@@ -307,7 +307,7 @@ and unary parser =
       (parser, node)
   | None -> application parser
 
-(* application = primary primary { primary } *)
+(* application = primary { primary } *)
 and application parser =
   let parser, (head_expr : Ast.Expr.t) = expect_primary parser in
   let parser, last_expr_opt, tail_exprs = any_number_of primary parser in
