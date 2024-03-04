@@ -11,6 +11,7 @@ let rec translate_expr (expr : Expr.t) =
   | UnaryOp _ -> failwith "unimplemented"
   | Application (fn, args) -> translate_application fn args
   | Grouping expr -> translate_expr expr
+  | Chain _ -> failwith "unimplemented"
   | Primary (_, lexeme) -> Variable lexeme
 
 and translate_let_in patterns bound_expr body_expr =
