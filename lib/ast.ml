@@ -156,6 +156,9 @@ module Expr = struct
     | Application of t * t list
     (* "(" expr ")" *)
     | Grouping of t
+    (* expr ";" expr *)
+    | Chain of t * t
+    (* NUMBER | STRING | IDENTIFIER *)
     | Primary of primary_kind * string
   [@@deriving show]
 
@@ -208,6 +211,10 @@ module Expr = struct
             :: List.mapi arg_to_edge args )
       | Grouping expr ->
           ("grouping", [ Tree.edge ~label:"expr" (to_tree_vertex expr) ])
+      | Chain (lhs, rhs) ->
+          ( "chain",
+            [ Tree.edge (to_tree_vertex lhs); Tree.edge (to_tree_vertex rhs) ]
+          )
       | Primary (kind, value) ->
           (* Need to escape quotes properly if a string literal. *)
           let value =

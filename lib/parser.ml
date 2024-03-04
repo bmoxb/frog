@@ -179,8 +179,25 @@ and literal_pattern parser =
 let expect_pattern parser =
   expect_or_syntax_error pattern "Expected a pattern." parser
 
-(* expr = let_in | match | if_then_else | logical_or *)
+(* expr = core_expr [ ";" expr ] *)
 let rec expr parser =
+  let parser, (lhs : Ast.Expr.t) = core_expr parser in
+  match peek_kind parser with
+  | Some Token.Semicolon ->
+      (* Consume and discard the semicolon. *)
+      let parser, _ = advance parser in
+      let parser, (rhs : Ast.Expr.t) = expr parser in
+      let node : Ast.Expr.t =
+        {
+          pos = { start = lhs.pos.start; finish = rhs.pos.finish };
+          kind = Ast.Expr.Chain (lhs, rhs);
+        }
+      in
+      (parser, node)
+  | _ -> (parser, lhs)
+
+(* core_expr = let_in | match | if_then_else | logical_or *)
+and core_expr parser =
   match peek_kind parser with
   | Some LetKeyword -> let_in parser
   | Some MatchKeyword -> match_with parser
@@ -188,7 +205,7 @@ let rec expr parser =
   | _ -> logical_or parser
 
 (* let_in = let "in" expr *)
-and let_in parser : t * Ast.Expr.t =
+and let_in parser =
   let parser, start, patterns, data_type, bound_expr = parse_let parser in
   let parser, _ = expect_kind InKeyword "Expected 'in' keyword." parser in
   let parser, body_expr = expr parser in
