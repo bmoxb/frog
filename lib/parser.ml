@@ -101,32 +101,16 @@ let rec data_type parser =
 and expect_data_type parser =
   expect_or_syntax_error data_type "Expected a type." parser
 
-(* simple_type = [ "@" ] IDENTIFIER *)
+(* simple_type = IDENTIFIER | LOCATION_IDENTIFIER *)
 and simple_type parser =
-  match peek_kind parser with
-  | Some Token.At ->
-      let parser, at_token = advance parser in
-      let parser, identifier_token =
-        expect_kind Token.Identifier
-          "Expected an identifier for this location type." parser
-      in
-      let identifier = Token.lexeme parser.source_code identifier_token in
-      let node : Ast.DataType.t =
-        {
-          pos =
-            { start = at_token.pos.start; finish = identifier_token.pos.finish };
-          kind = Ast.DataType.Location identifier;
-        }
-      in
-      Some (parser, node)
-  | Some Token.Identifier ->
-      let parser, token = advance parser in
-      let identifier = Token.lexeme parser.source_code token in
-      let node : Ast.DataType.t =
-        { pos = token.pos; kind = Ast.DataType.Identifier identifier }
-      in
-      Some (parser, node)
-  | _ -> None
+  Option.bind (peek_kind parser) Ast.DataType.token_kind_to_simple_kind
+  |> Option.map (fun kind ->
+         let parser, token = advance parser in
+         let identifier = Token.lexeme parser.source_code token in
+         let node : Ast.DataType.t =
+           { pos = token.pos; kind = Ast.DataType.Simple (kind, identifier) }
+         in
+         (parser, node))
 
 and expect_simple_type parser =
   expect_or_syntax_error simple_type "Expected a simple type." parser
@@ -170,7 +154,7 @@ and type_constructor_pattern parser =
       in
       (parser, node)
 
-(* literal_pattern = NUMBER | STRING *)
+(* literal_pattern = NUMBER_LITERAL | STRING_LITERAL *)
 and literal_pattern parser =
   let parser, token = advance parser in
   let literal = Token.lexeme parser.source_code token in
@@ -339,7 +323,8 @@ and application parser =
     in
     (parser, node)
 
-(* primary = NUMBER | STRING | IDENTIFIER | grouping *)
+(* primary = NUMBER_LITERAL | STRING_LITERAL | IDENTIFIER | LOCATION_IDENTIFIER
+           | grouping *)
 and primary parser =
   match Option.bind (peek_kind parser) Ast.Expr.token_kind_to_primary_kind with
   | Some primary_kind ->
