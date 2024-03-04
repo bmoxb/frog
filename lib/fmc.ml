@@ -6,9 +6,7 @@ type location = Lambda | Location of string [@@deriving show]
 
 let display_location = function Lambda -> "" | Location a -> a
 
-type jump = Star | Jump of string [@@deriving show]
-
-let display_jump = function Star -> "*" | Jump j -> j
+type jump = string [@@deriving show]
 
 (**
  * Term of the Functional Machine Calculus augmented with jumps.
@@ -26,6 +24,8 @@ type t =
   (* Abstraction / Pop Action
    * a<x>.M *)
   | Pop of location * variable * t
+  (* N; M *)
+  | Composition of t * t
   (* N; j -> M *)
   | Choice of t * jump * t
   (* M^j *)
@@ -35,11 +35,10 @@ type t =
 let rec display =
   let open Printf in
   function
-  | Variable var -> var
-  | Jump j -> display_jump j
+  | Variable s | Jump s -> s
   | Push (n, a, m) ->
       sprintf "[%s]%s.%s" (display n) (display_location a) (display m)
   | Pop (a, x, m) -> sprintf "%s<%s>.%s" (display_location a) x (display m)
-  | Choice (n, Star, m) -> sprintf "%s; %s" (display n) (display m)
-  | Choice (n, Jump j, m) -> sprintf "%s; %s -> %s" (display n) j (display m)
-  | Loop (m, j) -> sprintf "%s^%s" (show m) (display_jump j)
+  | Composition (n, m) -> sprintf "%s; %s" (display n) (display m)
+  | Choice (n, j, m) -> sprintf "%s; %s -> %s" (display n) j (display m)
+  | Loop (m, j) -> sprintf "%s^%s" (display m) j
