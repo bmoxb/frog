@@ -39,21 +39,27 @@ module Pattern = struct
 end
 
 module DataType = struct
+  type simple_kind = Identifier | Location [@@deriving show]
+
+  let token_kind_to_simple_kind = function
+    | Token.Identifier -> Some Identifier
+    | Token.LocationIdentifier -> Some Location
+    | _ -> None
+
+  let display_simple_kind = function
+    | Identifier -> "identifier"
+    | Location -> "location"
+
   type t = { pos : Position.t; kind : kind }
 
-  and kind =
-    | Identifier of identifier
-    | Location of identifier
-    | Function of t list * t list
+  and kind = Simple of simple_kind * identifier | Function of t list * t list
   [@@deriving show]
 
   let rec to_tree_vertex data_type =
     let label, edges =
       match data_type.kind with
-      | Identifier identifier ->
-          ("identifier", [ Tree.edge (Tree.vertex identifier) ])
-      | Location identifier ->
-          ("location", [ Tree.edge (Tree.vertex ("@" ^ identifier)) ])
+      | Simple (kind, identifier) ->
+          (display_simple_kind kind, [ Tree.edge (Tree.vertex identifier) ])
       | Function (inputs, outputs) ->
           let data_type_to_edge data_type =
             Tree.edge (to_tree_vertex data_type)
@@ -125,19 +131,21 @@ module Expr = struct
 
   let display_unary_operator = function Not -> "not" | Negate -> "-"
 
-  type primary_kind = NumberLiteral | StringLiteral | Identifier
+  type primary_kind = NumberLiteral | StringLiteral | Identifier | Location
   [@@deriving show]
 
   let token_kind_to_primary_kind = function
     | Token.NumberLiteral -> Some NumberLiteral
     | Token.StringLiteral -> Some StringLiteral
     | Token.Identifier -> Some Identifier
+    | Token.LocationIdentifier -> Some Location
     | _ -> None
 
   let display_primary_kind = function
     | NumberLiteral -> "number literal"
     | StringLiteral -> "string literal"
     | Identifier -> "identifier"
+    | Location -> "location"
 
   type t = { pos : Position.t; kind : kind } [@@deriving show]
 

@@ -84,8 +84,8 @@ let token_kind c lexer =
       |> conditionally_advance (( = ) '=') ~if_match:LessThanOrEqual
            ~otherwise:LessThan
   | '|' -> (lexer, Pipe)
-  | '@' -> (lexer, At)
   | '"' -> handle_string lexer
+  | '@' -> handle_identifier lexer
   | c when is_digit c -> handle_number lexer
   | c when is_identifier c -> handle_identifier lexer
   | _ -> Err.raise_lexical_error c lexer.pos
