@@ -36,6 +36,10 @@ let test_valid_capitalised_identifier_tokens inputs =
   test_valid_tokens "capitalised identifier"
     (List.map (fun s -> (s, Token.CapitalisedIdentifier)) inputs)
 
+let test_valid_location_identifier_tokens inputs =
+  test_valid_tokens "location identifier"
+    (List.map (fun s -> (s, Token.LocationIdentifier)) inputs)
+
 let test_valid_string_literal_tokens inputs =
   let input_to_pair s = (s, Token.StringLiteral) in
   test_valid_tokens "string literal" (List.map input_to_pair inputs)
@@ -97,6 +101,7 @@ let tests =
            [ "x"; "_"; "identifier"; "_identifier"; "noT"; "iF"; "x0" ]
        @ test_valid_capitalised_identifier_tokens
            [ "Foo"; "BAR"; "Else"; "X"; "A123" ]
+       @ test_valid_location_identifier_tokens [ "@stdout"; "@stdin"; "@CAPS" ]
        @ test_valid_string_literal_tokens
            [ "\"\""; "\"Hello, world!\""; "\"123\"" ]
        @ test_valid_number_literal_tokens

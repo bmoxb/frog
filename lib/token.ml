@@ -26,13 +26,13 @@ type kind =
   | LessThan (* < *)
   | LessThanOrEqual (* <= *)
   | Pipe (* | *)
-  | At (* @ *)
   (* Literals *)
   | StringLiteral
   | NumberLiteral
   (* Identifiers / Keywords *)
   | Identifier (* begins with underscore or lowercase letter *)
   | CapitalisedIdentifier (* begins with uppercase letter *)
+  | LocationIdentifier (* begins with '@' *)
   | NotKeyword
   | AndKeyword
   | OrKeyword
@@ -67,6 +67,8 @@ let lookup_identifier_or_keyword = function
   | "data" -> DataKeyword
   | "match" -> MatchKeyword
   | "with" -> WithKeyword
-  | lexeme ->
-      let is_uppercase = function 'A' .. 'Z' -> true | _ -> false in
-      if is_uppercase lexeme.[0] then CapitalisedIdentifier else Identifier
+  | lexeme -> (
+      match lexeme.[0] with
+      | 'A' .. 'Z' -> CapitalisedIdentifier
+      | '@' -> LocationIdentifier
+      | _ -> Identifier)
