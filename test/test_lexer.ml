@@ -66,8 +66,6 @@ let tests =
          [
            ("(", Token.OpenBracket);
            (")", Token.CloseBracket);
-           ("{", Token.OpenCurly);
-           ("}", Token.CloseCurly);
            ("+", Token.Plus);
            ("-", Token.Minus);
            ("*", Token.Star);
@@ -75,7 +73,6 @@ let tests =
            ("=", Token.Equals);
            (":", Token.Colon);
            (";", Token.Semicolon);
-           (".", Token.Dot);
            (",", Token.Comma);
            ("!", Token.Exclamation);
            (">", Token.GreaterThan);
@@ -96,6 +93,10 @@ let tests =
              ("else", ElseKeyword);
              ("let", LetKeyword);
              ("in", InKeyword);
+             ("alias", AliasKeyword);
+             ("data", DataKeyword);
+             ("match", MatchKeyword);
+             ("with", WithKeyword);
            ]
        @ test_valid_identifier_tokens
            [ "x"; "_"; "identifier"; "_identifier"; "noT"; "iF"; "x0" ]
@@ -105,19 +106,15 @@ let tests =
        @ test_valid_string_literal_tokens
            [ "\"\""; "\"Hello, world!\""; "\"123\"" ]
        @ test_valid_number_literal_tokens
-           [ "0"; "10"; "123456789"; "0.1"; "1."; "135.790001000300050007" ]
+           [
+             "0"; "10"; "123456789"; "0.1"; "1."; ".1"; "135.790001000300050007";
+           ]
        @ [
            test_valid_token_stream "repeated = signs" " ===== "
              [
                { kind = Token.Equiv; pos = { start = 1; finish = 3 } };
                { kind = Token.Equiv; pos = { start = 3; finish = 5 } };
                { kind = Token.Equals; pos = { start = 5; finish = 6 } };
-             ];
-           test_valid_token_stream "dot before number literal" ".5\n5."
-             [
-               { kind = Token.Dot; pos = { start = 0; finish = 1 } };
-               { kind = Token.NumberLiteral; pos = { start = 1; finish = 2 } };
-               { kind = Token.NumberLiteral; pos = { start = 3; finish = 5 } };
              ];
            test_valid_token_stream "multiple string literals"
              "\"abc\"\"def\nghi\""

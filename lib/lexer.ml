@@ -54,10 +54,6 @@ let token_kind c lexer =
   match c with
   | '(' -> (lexer, OpenBracket)
   | ')' -> (lexer, CloseBracket)
-  | '{' -> (lexer, OpenCurly)
-  | '}' -> (lexer, CloseCurly)
-  | '[' -> (lexer, OpenSquare)
-  | ']' -> (lexer, CloseSquare)
   | '+' -> (lexer, Plus)
   | '-' ->
       lexer
@@ -69,7 +65,6 @@ let token_kind c lexer =
       |> conditionally_advance (( = ) '=') ~if_match:Equiv ~otherwise:Equals
   | ':' -> (lexer, Colon)
   | ';' -> (lexer, Semicolon)
-  | '.' -> (lexer, Dot)
   | ',' -> (lexer, Comma)
   | '!' ->
       lexer
@@ -86,7 +81,7 @@ let token_kind c lexer =
   | '|' -> (lexer, Pipe)
   | '"' -> handle_string lexer
   | '@' -> handle_identifier lexer
-  | c when is_digit c -> handle_number lexer
+  | c when is_digit c || c = '.' -> handle_number lexer
   | c when is_identifier c -> handle_identifier lexer
   | _ -> Err.raise_lexical_error c lexer.pos
 

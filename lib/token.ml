@@ -4,10 +4,6 @@
 type kind =
   | OpenBracket (* ( *)
   | CloseBracket (* ) *)
-  | OpenCurly (* { *)
-  | CloseCurly (* } *)
-  | OpenSquare (* [ *)
-  | CloseSquare (* ] *)
   | Plus (* + *)
   | Minus (* - *)
   | Arrow (* -> *)
@@ -17,7 +13,6 @@ type kind =
   | Equiv (* == *)
   | Colon (* : *)
   | Semicolon (* ; *)
-  | Dot (* . *)
   | Comma (* , *)
   | Exclamation (* ! *)
   | NotEquiv (* != *)
@@ -41,10 +36,10 @@ type kind =
   | ElseKeyword
   | LetKeyword
   | InKeyword
-  | AliasKeyword (* TODO: test *)
-  | DataKeyword (* TODO: test *)
-  | MatchKeyword (* TODO: test *)
-  | WithKeyword (* TODO: test *)
+  | AliasKeyword
+  | DataKeyword
+  | MatchKeyword
+  | WithKeyword
 [@@deriving show]
 
 type t = { kind : kind; pos : Position.t } [@@deriving show]
