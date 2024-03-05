@@ -166,7 +166,7 @@ module Expr = struct
     | Grouping of t
     (* expr ";" expr *)
     | Chain of t * t
-    (* NUMBER | STRING | IDENTIFIER *)
+    (* NUMBER_LITERAL | STRING_LITERAL | IDENTIFIER | LOCATION_IDENTIFIER *)
     | Primary of primary_kind * string
   [@@deriving show]
 

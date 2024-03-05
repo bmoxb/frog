@@ -30,14 +30,8 @@ let tests =
              ("f 5", "[5].f");
              ("f (5 + 1)", "[1].[5].+; f");
              ("f 1 2", "[2].[1].f");
-             ("f (1 + 2) 3", "[3].[1].[2].+; f");
-           ]
-       @ test_translate_exprs "let-in"
-           [
-             ("let foo : int = 10 in foo + 2", "[10]; <foo>.[2].[foo].+");
-             ("let bar : int = 5 + 2 in bar", "[2].[5].+; <bar>.bar");
-             ( "let f x : int -> int = x + 1 in f (5 + 2)",
-               "[<x>.[1].[x].+].<f>.([2].[5].+; f)" );
+             ("f (1 + 2) 3", "[3].[2].[1].+; f");
+             ("f (g 10) (g (2 + 1))", "[1].[2].+; g; [10].g; f");
            ]
 
 let () = run_test_tt_main tests

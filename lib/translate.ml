@@ -11,7 +11,7 @@ let rec translate_expr (expr : Expr.t) =
   | UnaryOp _ -> failwith "unimplemented"
   | Application (fn, args) -> translate_application fn args
   | Grouping expr -> translate_expr expr
-  | Chain _ -> failwith "unimplemented"
+  | Chain (lhs, rhs) -> Composition (translate_expr lhs, translate_expr rhs)
   | Primary (_, lexeme) -> Variable lexeme
 
 and translate_let_in patterns bound_expr body_expr =
@@ -53,7 +53,16 @@ and translate_bin_op op lhs rhs =
   | _ ->
       Composition (translate_expr rhs, Composition (translate_expr lhs, op_var))
 
-and translate_application _fn _args = failwith "unimplemented"
+and translate_application fn args =
+  (* TODO: handle locations *)
+  let traverse : Expr.t list -> Fmc.t = function
+    | { pos = _; kind = Expr.Primary (_, lexeme) } :: tail ->
+        Push (Variable lexeme, Lambda, translate_application fn tail)
+    | expr :: tail ->
+        Composition (translate_expr expr, translate_application fn tail)
+    | [] -> translate_expr fn
+  in
+  traverse (List.rev args)
 
 let translate (node : Ast.t) =
   match node.kind with
