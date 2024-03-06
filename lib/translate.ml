@@ -8,7 +8,7 @@ let rec translate_expr (expr : Expr.t) =
   | Match _ -> failwith "unimplemented"
   | IfThenElse _ -> failwith "unimplemented"
   | BinOp (op, lhs, rhs) -> translate_bin_op op lhs rhs
-  | UnaryOp _ -> failwith "unimplemented"
+  | UnaryOp (op, expr) -> translate_unary_op op expr
   | Application (fn, args) -> translate_application fn args
   | Grouping expr -> translate_expr expr
   | Chain (lhs, rhs) -> Composition (translate_expr lhs, translate_expr rhs)
@@ -56,6 +56,16 @@ and translate_bin_op op lhs rhs =
   (* expr op expr *)
   | _ ->
       Composition (translate_expr rhs, Composition (translate_expr lhs, op_var))
+
+and translate_unary_op op expr =
+  match op with
+  | Not -> failwith "unimplemented"
+  | Negate -> (
+      let push_0_and_subtract = Push (Variable "0", Lambda, Variable "-") in
+      match expr.kind with
+      | Primary (_, primary) ->
+          Push (Variable primary, Lambda, push_0_and_subtract)
+      | _ -> Composition (translate_expr expr, push_0_and_subtract))
 
 and translate_application fn args =
   let rec function_application : Expr.t list -> Fmc.t = function

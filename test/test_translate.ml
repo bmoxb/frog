@@ -20,12 +20,18 @@ let tests =
          [
            ("10", "10"); ("\"abc\"", "\"abc\""); ("foo", "foo"); ("@a", "a<x>.x");
          ]
-       @ test_translate_exprs "arithmetic"
+       @ test_translate_exprs "binary arithmetic"
            [
              ("5 - 2", "[2].[5].-");
              ("10 / 2 - 4", "[4].[2].[10]./; -");
              ("30 - 15 / 5", "[5].[15]./; [30].-");
              ("3 * 3 - 6 / 2", "[2].[6]./; [3].[3].*; -");
+           ]
+       @ test_translate_exprs "unary arithmetic"
+           [
+             ("-5", "[5].[0].-");
+             ("-x", "[x].[0].-");
+             ("-(5 + x)", "[x].[5].+; [0].-");
            ]
        @ test_translate_exprs "application"
            [
