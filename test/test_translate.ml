@@ -39,6 +39,7 @@ let tests =
              ("f (5 + 1)", "[1].[5].+; f");
              ("f 1 2", "[2].[1].f");
              ("f (1 + 2) 3", "[3].[2].[1].+; f");
+             ("f 1 + 2", "[2].[1].f; +");
              ("f (g 10) (g (2 + x))", "[x].[2].+; g; [10].g; f");
            ]
        @ test_translate_exprs "location push"
@@ -47,6 +48,12 @@ let tests =
              ("@stdout 1 (2 + 3)", "[1]stdout.[3].[2].+; <x>.[x]stdout");
              ( "@location (10 + foo) (1 + 2)",
                "[foo].[10].+; <x>.[x]location.[2].[1].+; <x>.[x]location" );
+           ]
+       @ test_translate_exprs "location pop"
+           [
+             ("10 + @a", "a<x>.[x].[10].+");
+             ("@a - @b", "b<x>.[x].a<x>.[x].-");
+             ("@a - @b / @c", "c<x>.[x].b<x>.[x]./; a<x>.[x].-");
            ]
 
 let () = run_test_tt_main tests

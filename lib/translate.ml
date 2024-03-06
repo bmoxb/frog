@@ -1,6 +1,22 @@
 open Fmc
 open Ast
 
+let eval_primary kind lexeme =
+  match kind with
+  | Expr.Location ->
+      let name = String.sub lexeme 1 (String.length lexeme - 1) in
+      (* TODO: variable name *)
+      Pop (Location name, "x", Variable "x")
+  | _ -> Variable lexeme
+
+let push_primary kind lexeme ~next_term =
+  match kind with
+  | Expr.Location ->
+      let name = String.sub lexeme 1 (String.length lexeme - 1) in
+      (* TODO: variable name *)
+      Pop (Location name, "x", Push (Variable "x", Lambda, next_term))
+  | _ -> Push (Variable lexeme, Lambda, next_term)
+
 let rec translate_expr (expr : Expr.t) =
   match expr.kind with
   | LetIn (patterns, _, bound_expr, body_expr) ->
@@ -12,11 +28,7 @@ let rec translate_expr (expr : Expr.t) =
   | Application (fn, args) -> translate_application fn args
   | Grouping expr -> translate_expr expr
   | Chain (lhs, rhs) -> Composition (translate_expr lhs, translate_expr rhs)
-  | Primary (Expr.Location, lexeme) ->
-      let name = String.sub lexeme 1 (String.length lexeme - 1) in
-      (* TODO: variable name *)
-      Pop (Location name, "x", Variable "x")
-  | Primary (_, lexeme) -> Variable lexeme
+  | Primary (kind, lexeme) -> eval_primary kind lexeme
 
 and translate_let_in patterns bound_expr body_expr =
   let rec bound_expr_with_args_popped (args : Pattern.t list) =
@@ -45,14 +57,17 @@ and translate_bin_op op lhs rhs =
   let op_var = Variable (Expr.display_binary_operator op) in
   match (lhs.kind, rhs.kind) with
   (* primary op primary *)
-  | Primary (_, lhs), Primary (_, rhs) ->
-      Push (Variable rhs, Lambda, Push (Variable lhs, Lambda, op_var))
+  | Primary (lhs_kind, lhs_lexeme), Primary (rhs_kind, rhs_lexeme) ->
+      push_primary rhs_kind rhs_lexeme
+        ~next_term:(push_primary lhs_kind lhs_lexeme ~next_term:op_var)
   (* expr op primary *)
-  | _, Primary (_, primary) ->
-      Composition (Push (Variable primary, Lambda, translate_expr lhs), op_var)
+  | _, Primary (kind, lexeme) ->
+      Composition
+        (push_primary kind lexeme ~next_term:(translate_expr lhs), op_var)
   (* primary op expr *)
-  | Primary (_, primary), _ ->
-      Composition (translate_expr rhs, Push (Variable primary, Lambda, op_var))
+  | Primary (kind, lexeme), _ ->
+      Composition
+        (translate_expr rhs, push_primary kind lexeme ~next_term:op_var)
   (* expr op expr *)
   | _ ->
       Composition (translate_expr rhs, Composition (translate_expr lhs, op_var))
