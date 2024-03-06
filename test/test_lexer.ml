@@ -93,7 +93,6 @@ let tests =
              ("else", ElseKeyword);
              ("let", LetKeyword);
              ("in", InKeyword);
-             ("alias", AliasKeyword);
              ("data", DataKeyword);
              ("match", MatchKeyword);
              ("with", WithKeyword);

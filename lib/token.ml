@@ -13,7 +13,7 @@ type kind =
   | Equiv (* == *)
   | Colon (* : *)
   | Semicolon (* ; *)
-  | Comma (* , *)
+  | Comma (* TODO: Currently unused but may be used for multiple return vals. *)
   | Exclamation (* ! *)
   | NotEquiv (* != *)
   | GreaterThan (* > *)
@@ -36,7 +36,6 @@ type kind =
   | ElseKeyword
   | LetKeyword
   | InKeyword
-  | AliasKeyword
   | DataKeyword
   | MatchKeyword
   | WithKeyword
@@ -58,7 +57,6 @@ let lookup_identifier_or_keyword = function
   | "else" -> ElseKeyword
   | "let" -> LetKeyword
   | "in" -> InKeyword
-  | "alias" -> AliasKeyword
   | "data" -> DataKeyword
   | "match" -> MatchKeyword
   | "with" -> WithKeyword

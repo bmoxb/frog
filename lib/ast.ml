@@ -275,8 +275,6 @@ let data_arm_to_edge index (_, constructor_identifier, data_type_opt) =
 type kind =
   (* "let" pattern { pattern } ":" type "=" expr *)
   | Let of Pattern.t list * DataType.t * Expr.t
-  (* "alias" IDENTIFIER "=" type *)
-  | Alias of identifier * DataType.t
   (* "data" IDENTIFIER "=" [ "|" ] data_arm { "|" data_arm } *)
   | Data of identifier * data_arm list
 [@@deriving show]
@@ -295,12 +293,6 @@ let to_tree_vertex node =
               Tree.edge ~label:"type" (DataType.to_tree_vertex data_type);
               Tree.edge ~label:"expr" (Expr.to_tree_vertex expr);
             ] )
-    | Alias (identifier, data_type) ->
-        ( "alias",
-          [
-            Tree.edge ~label:"identifier" (Tree.vertex identifier);
-            Tree.edge ~label:"data type" (DataType.to_tree_vertex data_type);
-          ] )
     | Data (identifier, arms) ->
         ( "data",
           Tree.edge ~label:"identifier" (Tree.vertex identifier)

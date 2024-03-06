@@ -408,24 +408,6 @@ let let_binding parser =
   in
   (parser, node)
 
-(* alias = "alias" IDENTIFIER "=" type *)
-let type_alias parser =
-  let parser, alias_token = advance parser in
-  let parser, token =
-    expect_kind Token.Identifier
-      "Expected an identifier name for this type alias." parser
-  in
-  let identifier = Token.lexeme parser.source_code token in
-  let parser, _ = expect_kind Token.Equals "Expected '=' token." parser in
-  let parser, data_type = expect_data_type parser in
-  let node : Ast.t =
-    {
-      pos = { start = alias_token.pos.start; finish = data_type.pos.finish };
-      kind = Ast.Alias (identifier, data_type);
-    }
-  in
-  (parser, node)
-
 (* data_arm = CAPITALISED_IDENTIFIER [ type ] *)
 let data_arm parser =
   let parser, token =
@@ -464,7 +446,6 @@ let data_definition parser =
 let top_level parser =
   let match_kind = function
     | Token.LetKeyword -> let_binding parser
-    | Token.AliasKeyword -> type_alias parser
     | Token.DataKeyword -> data_definition parser
     | _ ->
         let _, unexpected_token = advance parser in
