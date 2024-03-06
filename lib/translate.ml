@@ -12,6 +12,10 @@ let rec translate_expr (expr : Expr.t) =
   | Application (fn, args) -> translate_application fn args
   | Grouping expr -> translate_expr expr
   | Chain (lhs, rhs) -> Composition (translate_expr lhs, translate_expr rhs)
+  | Primary (Expr.Location, lexeme) ->
+      let name = String.sub lexeme 1 (String.length lexeme - 1) in
+      (* TODO: variable name *)
+      Pop (Location name, "x", Variable "x")
   | Primary (_, lexeme) -> Variable lexeme
 
 and translate_let_in patterns bound_expr body_expr =
@@ -54,15 +58,33 @@ and translate_bin_op op lhs rhs =
       Composition (translate_expr rhs, Composition (translate_expr lhs, op_var))
 
 and translate_application fn args =
-  (* TODO: handle locations *)
-  let traverse : Expr.t list -> Fmc.t = function
+  let rec function_application : Expr.t list -> Fmc.t = function
     | { pos = _; kind = Expr.Primary (_, lexeme) } :: tail ->
-        Push (Variable lexeme, Lambda, translate_application fn tail)
+        Push (Variable lexeme, Lambda, function_application tail)
     | expr :: tail ->
-        Composition (translate_expr expr, translate_application fn tail)
+        Composition (translate_expr expr, function_application tail)
     | [] -> translate_expr fn
   in
-  traverse (List.rev args)
+  let rec location_push location_name (args : Expr.t list) =
+    let loc = Location location_name in
+    match args with
+    | { pos = _; kind = Expr.Primary (_, lexeme) } :: tail ->
+        Push (Variable lexeme, loc, location_push location_name tail)
+    | expr :: tail ->
+        (* TODO: variable name *)
+        Composition
+          ( translate_expr expr,
+            Pop
+              ( Lambda,
+                "x",
+                Push (Variable "x", loc, location_push location_name tail) ) )
+    | [] -> Jump Star
+  in
+  match fn with
+  | { pos = _; kind = Expr.Primary (Expr.Location, lexme) } ->
+      let location_name = String.sub lexme 1 (String.length lexme - 1) in
+      location_push location_name args
+  | _ -> function_application (List.rev args)
 
 let translate (node : Ast.t) =
   match node.kind with

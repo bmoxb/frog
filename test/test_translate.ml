@@ -17,7 +17,9 @@ let test_translate_exprs name_prefix =
 let tests =
   "translate"
   >::: test_translate_exprs "primary"
-         [ ("10", "10"); ("\"abc\"", "\"abc\""); ("foo", "foo") ]
+         [
+           ("10", "10"); ("\"abc\"", "\"abc\""); ("foo", "foo"); ("@a", "a<x>.x");
+         ]
        @ test_translate_exprs "arithmetic"
            [
              ("5 - 2", "[2].[5].-");
@@ -31,7 +33,14 @@ let tests =
              ("f (5 + 1)", "[1].[5].+; f");
              ("f 1 2", "[2].[1].f");
              ("f (1 + 2) 3", "[3].[2].[1].+; f");
-             ("f (g 10) (g (2 + 1))", "[1].[2].+; g; [10].g; f");
+             ("f (g 10) (g (2 + x))", "[x].[2].+; g; [10].g; f");
+           ]
+       @ test_translate_exprs "location push"
+           [
+             ("@stdout \"hello\"", "[\"hello\"]stdout");
+             ("@stdout 1 (2 + 3)", "[1]stdout.[3].[2].+; <x>.[x]stdout");
+             ( "@location (10 + foo) (1 + 2)",
+               "[foo].[10].+; <x>.[x]location.[2].[1].+; <x>.[x]location" );
            ]
 
 let () = run_test_tt_main tests
