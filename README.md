@@ -6,19 +6,31 @@ its underlying model of computation.
 
 The compiler is handwritten in OCaml.
 
-## Roadmap
+## TODO
 
-An overview of the work needed to complete the project.
-
-* [x] Implement lexer.
-* [ ] Implement parser.
-  * [x] Design grammar.
-  * [ ] Ensure grammar is unambigious.
-  * [ ] Convert unambigious grammar to predictive parser.
 * [ ] Implement semantic analysis.
   * [ ] Type checking.
-  * [ ] Ensuring pattern matching covers all cases.
-* [ ] FMC term generation.
+    * [ ] Are all let bindings assigned values of the specified type?
+    * [ ] Do all paths of match and if-then-else expressions return values of
+      the same type?
+    * [ ] Is function application performed with arguments of the correct
+      types?
+    * [ ] Are values of the correct types pushed to locations?
+    * [ ] Are arguments to built-in operators (+, -, etc.) of the correct
+      types?
+  * [ ] Ensure pattern matching covers all cases.
+* [ ] Translation to FMC terms.
+  * [ ] Expressions.
+    * [x] Primary expressions.
+    * [x] Binary operations.
+    * [x] Unary operations.
+    * [x] Function application.
+    * [ ] If-then-else expressions.
+    * [ ] Let-in expressions.
+    * [ ] Match expressions.
+  * [ ] Top-level definitions.
+    * [ ] Top-level let.
+    * [ ] Data definition.
 
 ## Features
 
