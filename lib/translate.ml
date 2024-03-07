@@ -62,24 +62,25 @@ and push_expr_to_specific_location (expr : Expr.t) location ~next_term =
 and translate_let_in patterns bound_expr body_expr =
   let rec bound_expr_with_args_popped (args : Pattern.t list) =
     match args with
-    | { pos = _; kind = Pattern.Identifier identifier } :: tail ->
+    | { kind = Pattern.Identifier identifier; _ } :: tail ->
         Pop (Lambda, identifier, bound_expr_with_args_popped tail)
-    | [] -> translate_expr bound_expr
+    | [] -> push_expr bound_expr ~next_term:(Jump Star)
     | _ -> failwith "unimplemented"
   in
   match patterns with
   (* Single identifier is bound to expression that is evaluated immediately. *)
-  | [ { pos = _; kind = Identifier identifier } ] ->
+  | [ { kind = Identifier identifier; _ } ] ->
       push_expr bound_expr
         ~next_term:
           (Pop (Lambda, identifier, push_expr body_expr ~next_term:(Jump Star)))
   (* Function with a bound expression that is evaluated only when the function
       is called. *)
-  | { pos = _; kind = Identifier identifier } :: arguments ->
+  | { kind = Identifier identifier; _ } :: arguments ->
       Push
         ( bound_expr_with_args_popped arguments,
           Lambda,
-          Pop (Lambda, identifier, translate_expr body_expr) )
+          Pop (Lambda, identifier, push_expr body_expr ~next_term:(Jump Star))
+        )
   | _ -> failwith "unimplemented"
 
 and translate_if_then_else condition then_expr else_expr =
