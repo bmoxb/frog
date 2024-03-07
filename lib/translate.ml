@@ -1,7 +1,7 @@
 open Fmc
 open Ast
 
-let lexeme_to_location s = Location (String.sub s 1 (String.length s - 1))
+let lexeme_to_location s = Loc (String.sub s 1 (String.length s - 1))
 
 let eval_primary kind lexeme =
   match kind with
@@ -31,7 +31,7 @@ let rec translate_expr (expr : Expr.t) =
   | UnaryOp (op, expr) -> translate_unary_op op expr
   | Application (fn, args) -> translate_application fn args
   | Grouping expr -> translate_expr expr
-  | Chain (lhs, rhs) -> Composition (translate_expr lhs, translate_expr rhs)
+  | Chain (lhs, rhs) -> Choice (translate_expr lhs, Star, translate_expr rhs)
   | Primary (kind, lexeme) -> push_primary kind lexeme ~next_term:(Jump Star)
 
 (* Convert an expression to an FMC term that directly evaluates to the computed
@@ -39,20 +39,24 @@ let rec translate_expr (expr : Expr.t) =
 and eval_expr (expr : Expr.t) =
   match expr.kind with
   | Primary (kind, lexeme) -> eval_primary kind lexeme
-  | _ -> Composition (translate_expr expr, Pop (Lambda, "x", Variable "x"))
+  | _ -> Choice (translate_expr expr, Star, Pop (Lambda, "x", Variable "x"))
 
 (* Convert an expression to an FMC term that pushes the computed value. *)
 and push_expr (expr : Expr.t) ~next_term =
   match expr.kind with
   | Primary (kind, lexeme) -> push_primary kind lexeme ~next_term
-  | _ -> Composition (translate_expr expr, next_term)
+  | _ -> (
+      match next_term with
+      | Jump Star -> translate_expr expr
+      | _ -> Choice (translate_expr expr, Star, next_term))
 
 and push_expr_to_specific_location (expr : Expr.t) location ~next_term =
   match expr.kind with
   | Primary (kind, lexeme) -> push_primary kind lexeme ~location ~next_term
   | _ ->
-      Composition
+      Choice
         ( translate_expr expr,
+          Star,
           Pop (Lambda, "x", Push (Variable "x", location, next_term)) )
 
 and translate_let_in patterns bound_expr body_expr =
@@ -66,8 +70,9 @@ and translate_let_in patterns bound_expr body_expr =
   match patterns with
   (* Single identifier is bound to expression that is evaluated immediately. *)
   | [ { pos = _; kind = Identifier identifier } ] ->
-      Composition
+      Choice
         ( translate_expr bound_expr,
+          Star,
           Pop (Lambda, identifier, translate_expr body_expr) )
   (* Function with a bound expression that is evaluated only when the function
       is called. *)
@@ -78,7 +83,13 @@ and translate_let_in patterns bound_expr body_expr =
           Pop (Lambda, identifier, translate_expr body_expr) )
   | _ -> failwith "unimplemented"
 
-and translate_if_then_else _condition _then_epxr _else_expr = failwith "todo"
+and translate_if_then_else condition then_expr else_expr =
+  let condition_term = eval_expr condition in
+  Choice
+    ( Choice
+        (condition_term, Jmp "True", push_expr then_expr ~next_term:(Jump Star)),
+      Jmp "False",
+      push_expr else_expr ~next_term:(Jump Star) )
 
 and translate_bin_op op lhs rhs =
   let op_var = Variable (Expr.display_binary_operator op) in

@@ -59,5 +59,12 @@ let tests =
              ("@a - @b / @c", "c<x>.[x].b<x>.[x]./; a<x>.[x].-");
              ("f (1 + 2) @a", "a<x>.[x].[2].[1].+; f");
            ]
+       @ test_translate_exprs "if-then-else"
+           [
+             ("if x then y else z", "x; True -> [y]; False -> [z]");
+             ( "if @in == \"hello\" then 1 + 2 else 3 + 4",
+               "[\"hello\"].in<x>.[x].==; <x>.x; True -> [2].[1].+; False -> \
+                [4].[3].+" );
+           ]
 
 let () = run_test_tt_main tests

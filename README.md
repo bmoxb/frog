@@ -25,7 +25,7 @@ The compiler is handwritten in OCaml.
     * [x] Binary operations.
     * [x] Unary operations.
     * [x] Function application.
-    * [ ] If-then-else expressions.
+    * [x] If-then-else expressions.
     * [ ] Let-in expressions.
     * [ ] Match expressions.
   * [ ] Top-level definitions.

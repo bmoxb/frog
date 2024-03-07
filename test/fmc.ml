@@ -8,12 +8,13 @@ let example_1 = Pop (Lambda, "x", Variable "x")
 let example_2_displayed = "[10].[5].[2].+; -"
 
 let example_2 =
-  Composition
+  Choice
     ( Push
         ( Variable "10",
           Lambda,
           Push (Variable "5", Lambda, Push (Variable "2", Lambda, Variable "+"))
         ),
+      Star,
       Variable "-" )
 
 let test_display name expected_string input_term =
