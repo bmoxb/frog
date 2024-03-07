@@ -1,20 +1,23 @@
 open Fmc
 open Ast
 
+let lexeme_to_location s = Location (String.sub s 1 (String.length s - 1))
+
 let eval_primary kind lexeme =
   match kind with
   | Expr.Location ->
-      let name = String.sub lexeme 1 (String.length lexeme - 1) in
       (* TODO: variable name *)
-      Pop (Location name, "x", Variable "x")
+      Pop (lexeme_to_location lexeme, "x", Variable "x")
   | _ -> Variable lexeme
 
 let push_primary ?(location = Lambda) kind lexeme ~next_term =
   match kind with
   | Expr.Location ->
-      let name = String.sub lexeme 1 (String.length lexeme - 1) in
       (* TODO: variable name *)
-      Pop (Location name, "x", Push (Variable "x", location, next_term))
+      Pop
+        ( lexeme_to_location lexeme,
+          "x",
+          Push (Variable "x", location, next_term) )
   | _ -> Push (Variable lexeme, location, next_term)
 
 let rec translate_expr (expr : Expr.t) =
@@ -92,17 +95,16 @@ and translate_application fn args =
     | expr :: tail -> push_expr expr ~next_term:(function_application tail)
     | [] -> eval_expr fn
   in
-  let rec location_push location_name (args : Expr.t list) =
+  let rec location_push location (args : Expr.t list) =
     match args with
     | expr :: tail ->
-        push_expr_to_specific_location expr (Location location_name)
-          ~next_term:(location_push location_name tail)
+        push_expr_to_specific_location expr location
+          ~next_term:(location_push location tail)
     | [] -> Jump Star
   in
-  match fn with
-  | { pos = _; kind = Expr.Primary (Expr.Location, lexme) } ->
-      let location_name = String.sub lexme 1 (String.length lexme - 1) in
-      location_push location_name args
+  match fn.kind with
+  | Primary (Expr.Location, lexeme) ->
+      location_push (lexeme_to_location lexeme) args
   | _ -> function_application (List.rev args)
 
 let translate (node : Ast.t) =
