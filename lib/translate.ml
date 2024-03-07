@@ -70,10 +70,9 @@ and translate_let_in patterns bound_expr body_expr =
   match patterns with
   (* Single identifier is bound to expression that is evaluated immediately. *)
   | [ { pos = _; kind = Identifier identifier } ] ->
-      Choice
-        ( translate_expr bound_expr,
-          Star,
-          Pop (Lambda, identifier, translate_expr body_expr) )
+      push_expr bound_expr
+        ~next_term:
+          (Pop (Lambda, identifier, push_expr body_expr ~next_term:(Jump Star)))
   (* Function with a bound expression that is evaluated only when the function
       is called. *)
   | { pos = _; kind = Identifier identifier } :: arguments ->

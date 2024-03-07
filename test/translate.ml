@@ -66,5 +66,12 @@ let tests =
                "[\"hello\"].in<x>.[x].==; <x>.x; True -> [2].[1].+; False -> \
                 [4].[3].+" );
            ]
+       @ test_translate_exprs "let-in"
+           [
+             ("let foo : int = 5 in foo", "[5].<foo>.[foo]");
+             ( "let bar : int = 12 + 2 in bar - 5",
+               "[2].[12].+; <bar>.[5].[bar].-" );
+             ("let foo : string = @in in foo", "in<x>.[x].<foo>.[foo]");
+           ]
 
 let () = run_test_tt_main tests
