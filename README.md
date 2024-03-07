@@ -26,11 +26,13 @@ The compiler is handwritten in OCaml.
     * [x] Unary operations.
     * [x] Function application.
     * [x] If-then-else expressions.
-    * [ ] Let-in expressions.
+    * [x] Let-in expressions.
     * [ ] Match expressions.
   * [ ] Top-level definitions.
     * [ ] Top-level let.
     * [ ] Data definition.
+  * [ ] Recursive functions.
+  * [ ] Proper handling of patterns including in let bindings.
 
 ## Features
 
