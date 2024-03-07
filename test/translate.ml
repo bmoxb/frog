@@ -18,7 +18,10 @@ let tests =
   "translate"
   >::: test_translate_exprs "primary"
          [
-           ("10", "10"); ("\"abc\"", "\"abc\""); ("foo", "foo"); ("@a", "a<x>.x");
+           ("10", "[10]");
+           ("\"abc\"", "[\"abc\"]");
+           ("foo", "[foo]");
+           ("@a", "a<x>.[x]");
          ]
        @ test_translate_exprs "binary arithmetic"
            [
@@ -54,6 +57,7 @@ let tests =
              ("10 + @a", "a<x>.[x].[10].+");
              ("@a - @b", "b<x>.[x].a<x>.[x].-");
              ("@a - @b / @c", "c<x>.[x].b<x>.[x]./; a<x>.[x].-");
+             ("f (1 + 2) @a", "a<x>.[x].[2].[1].+; f");
            ]
 
 let () = run_test_tt_main tests
