@@ -103,7 +103,7 @@ and translate_let (patterns : Pattern.t list) expr ~next_term =
     match args with
     | { kind = Pattern.Identifier identifier; _ } :: tail ->
         Pop (Lambda, identifier, expr_with_args_popped tail)
-    | [] -> push_expr expr ~next_term:(Jump Star)
+    | [] -> Grouping (push_expr expr ~next_term:(Jump Star))
     | _ -> failwith "unimplemented"
   in
   match patterns with
