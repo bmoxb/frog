@@ -1,4 +1,4 @@
-open Osaka.Fmc
+open Frog.Fmc
 open OUnit2
 
 let example_1_displayed = "<x>.x"

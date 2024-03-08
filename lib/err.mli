@@ -1,4 +1,4 @@
-(** Errors in an Osaka program (lexical, syntax, etc.) *)
+(** Errors in a Frog program (lexical, syntax, etc.) *)
 
 type t
 
@@ -11,5 +11,5 @@ val raise_syntax_error : Token.t -> string -> 'a
 val raise_unexpected_eof : unit -> 'a
 
 val display : filename:string -> source_code:string -> t -> string
-(** Create a  human-readable description of an error that includes the
-    offending line(s). *)
+(** Create a human-readable description of an error that includes the offending
+    line(s). *)

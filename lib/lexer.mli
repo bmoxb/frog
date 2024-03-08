@@ -1,4 +1,4 @@
-(** Osaka's lexer. Takes source code as input and produces tokens as output. *)
+(** Frog's lexer. Takes source code as input and produces tokens as output. *)
 
 type t
 

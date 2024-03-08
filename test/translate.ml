@@ -1,4 +1,4 @@
-open Osaka
+open Frog
 open OUnit2
 
 let test_translate_expr name source_code expected_terms =

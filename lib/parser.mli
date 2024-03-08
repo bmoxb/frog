@@ -1,4 +1,4 @@
-(** Osaka's parser. Takes tokens as input and produces an AST as output. *)
+(** Frog's parser. Takes tokens as input and produces an AST as output. *)
 
 type t
 

@@ -16,7 +16,7 @@ let speclist =
 
 let anon_fun path = input_path := path
 
-let usage_msg = "osaka [--debug-tokens <file>] [--debug-ast <file>] <input>"
+let usage_msg = "frog [--debug-tokens <file>] [--debug-ast <file>] <input>"
 
 let () =
   Arg.parse speclist anon_fun usage_msg;

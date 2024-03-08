@@ -1,4 +1,4 @@
 (executable
- (public_name osaka)
+ (public_name frog)
  (name main)
- (libraries osaka))
+ (libraries frog))

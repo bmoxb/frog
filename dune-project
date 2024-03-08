@@ -1,9 +1,9 @@
 (lang dune 3.11)
 
-(name osaka)
+(name frog)
 
 (source
- (github bmoxb/osaka))
+ (github bmoxb/frog))
 
 (authors "bmoxb")
 
@@ -11,10 +11,10 @@
 
 (license MIT)
 
-(documentation https://github.com/bmoxb/osaka)
+(documentation https://github.com/bmoxb/frog)
 
 (package
- (name osaka)
+ (name frog)
  (synopsis "An experimental functional programming language.")
  (depends ocaml dune))
 

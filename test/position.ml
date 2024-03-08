@@ -1,4 +1,4 @@
-open Osaka
+open Frog
 open OUnit2
 
 let test_determine_specific_position name ~source ~position ~expected =

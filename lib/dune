@@ -1,4 +1,4 @@
 (library
- (name osaka)
+ (name frog)
  (preprocess
   (pps ppx_deriving.show)))
