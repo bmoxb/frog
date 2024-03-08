@@ -4,11 +4,9 @@ open OUnit2
 let test_translate_top_level name source_code expected_terms =
   name >:: fun _ ->
   let tokens = Consume.get_tokens source_code in
-  match Parser.init source_code tokens |> Parser.top_level with
-  | Some (_, stmt) ->
-      let terms = Translate.translate stmt |> Fmc.display in
-      assert_equal expected_terms terms ~printer:(Printf.sprintf "\"%s\"")
-  | None -> assert_failure "Expected top-level definition."
+  let nodes = Consume.get_ast source_code tokens in
+  let terms = Translate.translate nodes |> Fmc.display in
+  assert_equal expected_terms terms ~printer:(Printf.sprintf "\"%s\"")
 
 let test_translate_expr name source_code expected_terms =
   name >:: fun _ ->
@@ -17,13 +15,15 @@ let test_translate_expr name source_code expected_terms =
   let terms = Translate.translate_expr expr |> Fmc.display in
   assert_equal expected_terms terms ~printer:(Printf.sprintf "\"%s\"")
 
-let test_translate_pairs test_fun name_prefix =
+let test_translate_pairs test_fun name =
   List.map (fun (source_code, expected_terms) ->
-      test_fun (name_prefix ^ ": " ^ source_code) source_code expected_terms)
+      test_fun (name ^ ": " ^ source_code) source_code expected_terms)
 
-let test_translate_top_levels = test_translate_pairs test_translate_top_level
+let test_translate_top_levels name =
+  test_translate_pairs test_translate_top_level (name ^ "expression")
 
-let test_translate_exprs = test_translate_pairs test_translate_expr
+let test_translate_exprs name =
+  test_translate_pairs test_translate_expr (name ^ "top-level")
 
 let tests =
   "translate"
@@ -91,7 +91,12 @@ let tests =
              ( "let sub x y : int int -> int = x - y in sub (5 + 1) 2",
                "[<x>.<y>.[y].[x].-].<sub>.([2].[1].[5].+; sub)" );
            ]
-       @ test_translate_top_levels "let binding constant" []
+       @ test_translate_top_levels "main"
+           [
+             ("let main = 10", "10"); ("let main = 10 + 2", "[2].[10].+; <x>.x");
+           ]
+       @ test_translate_top_levels "let binding constant"
+           [ ("let x : int = 5", "[5].<x>") ]
        @ test_translate_top_levels "let function" []
 
 let () = run_test_tt_main tests

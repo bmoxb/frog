@@ -119,9 +119,8 @@ and translate_let (patterns : Pattern.t list) expr ~next_term =
           Pop (Lambda, identifier, Grouping next_term) )
   | _ -> failwith "unimplemented"
 
-let translate (node : Ast.t) =
-  match node.kind with
-  | Let (patterns, _, expr) ->
-      (* TODO *)
-      translate_let patterns expr ~next_term:(Jump Star)
+let rec translate = function
+  | { kind = Let (patterns, _, expr); _ } :: tail ->
+      translate_let patterns expr ~next_term:(translate tail)
+  | [] -> Jump Star
   | _ -> failwith "unimplemented"
