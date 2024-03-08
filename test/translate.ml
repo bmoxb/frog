@@ -93,10 +93,15 @@ let tests =
            ]
        @ test_translate_top_levels "main"
            [
-             ("let main = 10", "10"); ("let main = 10 + 2", "[2].[10].+; <x>.x");
+             ("let main : int = 10", "10");
+             ("let main : int = 10 + 2", "[2].[10].+; <x>.x");
            ]
        @ test_translate_top_levels "let binding constant"
-           [ ("let x : int = 5", "[5].<x>") ]
+           [
+             ("let x : int = 5 \n let main : int = x", "[5].<x>.(x)");
+             ( "let x : int = 5 \n let y : int = 10 \n let main : int = x + y",
+               "[5].<x>.([10].<y>.([y].[x].+; <x>.x))" );
+           ]
        @ test_translate_top_levels "let function" []
 
 let () = run_test_tt_main tests

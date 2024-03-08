@@ -119,8 +119,21 @@ and translate_let (patterns : Pattern.t list) expr ~next_term =
           Pop (Lambda, identifier, Grouping next_term) )
   | _ -> failwith "unimplemented"
 
-let rec translate = function
-  | { kind = Let (patterns, _, expr); _ } :: tail ->
-      translate_let patterns expr ~next_term:(translate tail)
-  | [] -> Jump Star
-  | _ -> failwith "unimplemented"
+let translate nodes =
+  let rec translate_tracking_main ?main_expr = function
+    (* Main let binding and its the last node in the input list. *)
+    | [ { kind = Let ([ { kind = Identifier "main"; _ } ], _, expr); _ } ] ->
+        eval_expr expr
+    (* Main let binding but more AST nodes follow it. *)
+    | { kind = Let ([ { kind = Identifier "main"; _ } ], _, expr); _ } :: tail
+      ->
+        translate_tracking_main ~main_expr:expr tail
+    (* Normal let binding. *)
+    | { kind = Let (patterns, _, expr); _ } :: tail ->
+        translate_let patterns expr
+          ~next_term:(translate_tracking_main ?main_expr tail)
+    | [] ->
+        main_expr |> Option.map eval_expr |> Option.value ~default:(Jump Star)
+    | _ -> failwith "unimplemented"
+  in
+  translate_tracking_main nodes
