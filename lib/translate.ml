@@ -72,15 +72,20 @@ and translate_let_in patterns bound_expr body_expr =
   | [ { kind = Identifier identifier; _ } ] ->
       push_expr bound_expr
         ~next_term:
-          (Pop (Lambda, identifier, push_expr body_expr ~next_term:(Jump Star)))
+          (Pop
+             ( Lambda,
+               identifier,
+               Grouping (push_expr body_expr ~next_term:(Jump Star)) ))
   (* Function with a bound expression that is evaluated only when the function
       is called. *)
   | { kind = Identifier identifier; _ } :: arguments ->
       Push
         ( bound_expr_with_args_popped arguments,
           Lambda,
-          Pop (Lambda, identifier, push_expr body_expr ~next_term:(Jump Star))
-        )
+          Pop
+            ( Lambda,
+              identifier,
+              Grouping (push_expr body_expr ~next_term:(Jump Star)) ) )
   | _ -> failwith "unimplemented"
 
 and translate_if_then_else condition then_expr else_expr =

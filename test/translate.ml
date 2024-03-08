@@ -68,17 +68,17 @@ let tests =
            ]
        @ test_translate_exprs "let-in binding constant"
            [
-             ("let foo : int = 5 in foo", "[5].<foo>.[foo]");
-             ( "let bar : int = 12 + 2 in bar - 5",
-               "[2].[12].+; <bar>.[5].[bar].-" );
-             ("let foo : string = @in in foo", "in<x>.[x].<foo>.[foo]");
+             ("let foo : int = 5 in foo", "[5].<foo>.([foo])");
+             ( "let bar : int = 12 + 2 in bar - 6 / 2",
+               "[2].[12].+; <bar>.([2].[6]./; [bar].-)" );
+             ("let foo : string = @in in foo", "in<x>.[x].<foo>.([foo])");
            ]
        @ test_translate_exprs "let-in function"
            [
              ( "let identity x : int -> int = x in identity 5",
-               "[<x>.[x]].<identity>.[5].identity" );
+               "[<x>.[x]].<identity>.([5].identity)" );
              ( "let sub x y : int int -> int = x - y in sub (5 + 1) 2",
-               "[<x>.<y>.[y].[x].-].<sub>.[2].[1].[5].+; sub" );
+               "[<x>.<y>.[y].[x].-].<sub>.([2].[1].[5].+; sub)" );
            ]
 
 let () = run_test_tt_main tests

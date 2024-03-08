@@ -26,25 +26,27 @@ type t =
   | Choice of t * jump * t
   (* M^j *)
   | Loop of t * jump
+  (* (M) *)
+  | Grouping of t
 [@@deriving show]
 
 let rec display =
   let open Printf in
-  let display_location = function Loc s -> s | Lambda -> "" in
-  let display_loop_body = function
+  let jump = function Jmp j -> j | Star -> "*" in
+  let location = function Loc a -> a | Lambda -> "" in
+  let dot_term = function Jump Star -> "" | m -> "." ^ display m in
+  let choice_arm = function Star -> "" | Jmp j -> j ^ " -> " in
+  let loop_body = function
+    | Jump j -> jump j
     | Variable v -> v
     | m -> sprintf "(%s)" (display m)
   in
   function
-  | Variable v -> v
-  | Jump Star -> "*"
-  | Jump (Jmp j) -> j
-  | Push (n, a, Jump Star) -> sprintf "[%s]%s" (display n) (display_location a)
-  | Push (n, a, m) ->
-      sprintf "[%s]%s.%s" (display n) (display_location a) (display m)
-  | Pop (a, x, Jump Star) -> sprintf "%s<%s>" (display_location a) x
-  | Pop (a, x, m) -> sprintf "%s<%s>.%s" (display_location a) x (display m)
-  | Choice (n, Star, m) -> sprintf "%s; %s" (display n) (display m)
-  | Choice (n, Jmp j, m) -> sprintf "%s; %s -> %s" (display n) j (display m)
-  | Loop (m, Star) -> display_loop_body m ^ "*"
-  | Loop (m, Jmp j) -> sprintf "%s^%s" (display_loop_body m) j
+  | Variable x -> x
+  | Jump j -> jump j
+  | Push (n, a, m) -> sprintf "[%s]%s%s" (display n) (location a) (dot_term m)
+  | Pop (a, x, m) -> sprintf "%s<%s>%s" (location a) x (dot_term m)
+  | Choice (n, j, m) ->
+      sprintf "%s; %s%s" (display n) (choice_arm j) (display m)
+  | Loop (m, n) -> sprintf "%s^%s" (loop_body m) (jump n)
+  | Grouping m -> sprintf "(%s)" (display m)
