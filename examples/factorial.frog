@@ -1,0 +1,12 @@
+let factorial input : int -> int =
+    let factorial_accumulate n accum : int int -> int =
+        if n > 1 then
+            factorial_accumulate (n - 1) (n * accum)
+        else
+            accum
+    in
+    factorial_accumulate input 1
+
+let main : @in -> @out =
+    let input : int = @in in
+    @out (factorial input)

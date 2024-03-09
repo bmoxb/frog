@@ -1,0 +1,11 @@
+let secs_to_weeks secs : int -> int =
+    let per_minute : int = 60 in
+    let per_hour : int = per_minute * 60 in
+    let per_day : int = per_hour * 24 in
+    let per_week : int = per_day * 7 in
+    secs / per_week
+
+let main : @in -> @out =
+    @out "Enter seconds:";
+    let secs : int = @in in
+    @out "In weeks: " (secs_to_weeks secs)

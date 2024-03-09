@@ -1,0 +1,4 @@
+let main : @in -> @out =
+    @out "What's 2 + 2?";
+    let answer : int = @in in
+    @out (if answer == 4 then "Correct!" else "Incorrect...")

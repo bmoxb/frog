@@ -1,0 +1,17 @@
+let fib n : int -> int =
+    let loop a b n : int int int -> int =
+        if n > 0 then loop b (a + b) (n - 1)
+        else a
+    in
+    loop 0 1 n
+
+let main : @in -> @out =
+    let loop n : int -> int =
+        if n > 0 then
+            @out (string_of_int (fib 10));
+            loop (n - 1)
+        else
+            @out "end"
+    in
+    let input : int = @in in
+    @out (fib input)
