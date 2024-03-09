@@ -29,7 +29,7 @@ The compiler is handwritten in OCaml.
     * [x] Let-in expressions.
     * [ ] Match expressions.
   * [ ] Top-level definitions.
-    * [ ] Top-level let.
+    * [x] Top-level let.
     * [ ] Data definition.
   * [ ] Recursive functions.
   * [ ] Proper handling of patterns including in let bindings.
