@@ -1,6 +1,13 @@
 open Frog
 open OUnit2
 
+let test_translate_top_level name source_code expected_terms =
+  name >:: fun _ ->
+  let tokens = Consume.get_tokens source_code in
+  let nodes = Consume.get_ast source_code tokens in
+  let terms = Translate.translate nodes |> Fmc.display in
+  assert_equal expected_terms terms ~printer:(Printf.sprintf "\"%s\"")
+
 let test_translate_expr name source_code expected_terms =
   name >:: fun _ ->
   let tokens = Consume.get_tokens source_code in
@@ -8,11 +15,15 @@ let test_translate_expr name source_code expected_terms =
   let terms = Translate.translate_expr expr |> Fmc.display in
   assert_equal expected_terms terms ~printer:(Printf.sprintf "\"%s\"")
 
-let test_translate_exprs name_prefix =
+let test_translate_pairs test_fun name =
   List.map (fun (source_code, expected_terms) ->
-      test_translate_expr
-        (name_prefix ^ ": " ^ source_code)
-        source_code expected_terms)
+      test_fun (name ^ ": " ^ source_code) source_code expected_terms)
+
+let test_translate_top_levels name =
+  test_translate_pairs test_translate_top_level (name ^ " top-level")
+
+let test_translate_exprs name =
+  test_translate_pairs test_translate_expr (name ^ " expression")
 
 let tests =
   "translate"
@@ -76,9 +87,29 @@ let tests =
        @ test_translate_exprs "let-in function"
            [
              ( "let identity x : int -> int = x in identity 5",
-               "[<x>.[x]].<identity>.([5].identity)" );
+               "[<x>.([x])].<identity>.([5].identity)" );
              ( "let sub x y : int int -> int = x - y in sub (5 + 1) 2",
-               "[<x>.<y>.[y].[x].-].<sub>.([2].[1].[5].+; sub)" );
+               "[<x>.<y>.([y].[x].-)].<sub>.([2].[1].[5].+; sub)" );
+           ]
+       @ test_translate_top_levels "main"
+           [
+             ("let main : int = 10", "10");
+             ("let main : int = 10 + 2", "[2].[10].+; <x>.x");
+           ]
+       @ test_translate_top_levels "let binding constant"
+           [
+             ( "let a : int = 5 \n let main : @in -> int = @in + a",
+               "[5].<a>.([a].in<x>.[x].+; <x>.x)" );
+             ( "let a : int = 5 \n\
+               \ let b : int = 10 \n\
+               \ let main : @in -> int = a + b / @in",
+               "[5].<a>.([10].<b>.(in<x>.[x].[b]./; [a].+; <x>.x))" );
+           ]
+       @ test_translate_top_levels "let function"
+           [
+             ( "let f a : int -> int = a + 2 * 2 \n\
+               \ let main : @in -> int = f @in",
+               "[<a>.([2].[2].*; [a].+)].<f>.(in<x>.[x].f; <x>.x)" );
            ]
 
 let () = run_test_tt_main tests

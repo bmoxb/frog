@@ -60,33 +60,8 @@ and push_expr_to_specific_location (expr : Expr.t) location ~next_term =
           Pop (Lambda, "x", Push (Variable "x", location, next_term)) )
 
 and translate_let_in patterns bound_expr body_expr =
-  let rec bound_expr_with_args_popped (args : Pattern.t list) =
-    match args with
-    | { kind = Pattern.Identifier identifier; _ } :: tail ->
-        Pop (Lambda, identifier, bound_expr_with_args_popped tail)
-    | [] -> push_expr bound_expr ~next_term:(Jump Star)
-    | _ -> failwith "unimplemented"
-  in
-  match patterns with
-  (* Single identifier is bound to expression that is evaluated immediately. *)
-  | [ { kind = Identifier identifier; _ } ] ->
-      push_expr bound_expr
-        ~next_term:
-          (Pop
-             ( Lambda,
-               identifier,
-               Grouping (push_expr body_expr ~next_term:(Jump Star)) ))
-  (* Function with a bound expression that is evaluated only when the function
-      is called. *)
-  | { kind = Identifier identifier; _ } :: arguments ->
-      Push
-        ( bound_expr_with_args_popped arguments,
-          Lambda,
-          Pop
-            ( Lambda,
-              identifier,
-              Grouping (push_expr body_expr ~next_term:(Jump Star)) ) )
-  | _ -> failwith "unimplemented"
+  translate_let patterns bound_expr
+    ~next_term:(push_expr body_expr ~next_term:(Jump Star))
 
 and translate_if_then_else condition then_expr else_expr =
   let condition_term = eval_expr condition in
@@ -123,7 +98,42 @@ and translate_application fn args =
       location_push (lexeme_to_location lexeme) args
   | _ -> function_application (List.rev args)
 
-let translate (node : Ast.t) =
-  match node.kind with
-  | Let (_, _, expr) -> translate_expr expr
+and translate_let (patterns : Pattern.t list) expr ~next_term =
+  let rec expr_with_args_popped (args : Pattern.t list) =
+    match args with
+    | { kind = Pattern.Identifier identifier; _ } :: tail ->
+        Pop (Lambda, identifier, expr_with_args_popped tail)
+    | [] -> Grouping (push_expr expr ~next_term:(Jump Star))
+    | _ -> failwith "unimplemented"
+  in
+  match patterns with
+  (* Single identifier is bound to expression that is evaluated immediately. *)
+  | [ { kind = Identifier identifier; _ } ] ->
+      push_expr expr ~next_term:(Pop (Lambda, identifier, Grouping next_term))
+  (* Function with a bound expression that is evaluated only when the function
+      is called. *)
+  | { kind = Identifier identifier; _ } :: arguments ->
+      Push
+        ( expr_with_args_popped arguments,
+          Lambda,
+          Pop (Lambda, identifier, Grouping next_term) )
   | _ -> failwith "unimplemented"
+
+let translate nodes =
+  let rec translate_tracking_main ?main_expr = function
+    (* Main let binding and its the last node in the input list. *)
+    | [ { kind = Let ([ { kind = Identifier "main"; _ } ], _, expr); _ } ] ->
+        eval_expr expr
+    (* Main let binding but more AST nodes follow it. *)
+    | { kind = Let ([ { kind = Identifier "main"; _ } ], _, expr); _ } :: tail
+      ->
+        translate_tracking_main ~main_expr:expr tail
+    (* Normal let binding. *)
+    | { kind = Let (patterns, _, expr); _ } :: tail ->
+        translate_let patterns expr
+          ~next_term:(translate_tracking_main ?main_expr tail)
+    | [] ->
+        main_expr |> Option.map eval_expr |> Option.value ~default:(Jump Star)
+    | _ -> failwith "unimplemented"
+  in
+  translate_tracking_main nodes
