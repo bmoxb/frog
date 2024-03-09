@@ -16,7 +16,22 @@ let speclist =
 
 let anon_fun path = input_path := path
 
-let usage_msg = "frog [--debug-tokens <file>] [--debug-ast <file>] <input>"
+(* ASCII art source: http://allaboutfrogs.org/gallery/frogstuff/ascii.html *)
+let usage_msg =
+  {|
+Frog is a experimental functional programming language.
+See https://github.com/bmoxb/frog for details.
+
+             (ribit)
+                /   
+        o  o        
+       ( -- )       
+    /\( ,   ,)/\    
+  ^^   ^^  ^^   ^^  
+
+Usage: frog [--debug-tokens <file>] [--debug-ast <file>] <input>
+
+Options:|}
 
 let () =
   Arg.parse speclist anon_fun usage_msg;
