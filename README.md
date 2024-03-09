@@ -33,6 +33,7 @@ The compiler is handwritten in OCaml.
     * [ ] Data definition.
   * [ ] Recursive functions.
   * [ ] Proper handling of patterns including in let bindings.
+  * [ ] Handle unit properly.
 
 ## Features
 
