@@ -3,6 +3,12 @@ open Ast
 
 let lexeme_to_location s = Loc (String.sub s 1 (String.length s - 1))
 
+let translate_pattern (pattern : Pattern.t) ~next_term =
+  match pattern.kind with
+  | Identifier identifier -> Pop (Lambda, identifier, Grouping next_term)
+  | TypeConstructor (_identifier, _pattern_opt) -> failwith "unimplemented"
+  | Literal _lexeme -> failwith "unimplemented"
+
 let eval_primary kind lexeme =
   match kind with
   | Expr.Location ->
@@ -98,40 +104,37 @@ and translate_application fn args =
       location_push (lexeme_to_location lexeme) args
   | _ -> function_application (List.rev args)
 
-and translate_let (patterns : Pattern.t list) expr ~next_term =
-  let rec expr_with_args_popped (args : Pattern.t list) =
+and translate_let patterns expr ~next_term =
+  let rec expr_with_args_popped args =
     match args with
-    | { kind = Pattern.Identifier identifier; _ } :: tail ->
-        Pop (Lambda, identifier, expr_with_args_popped tail)
-    | [] -> Grouping (push_expr expr ~next_term:(Jump Star))
-    | _ -> failwith "unimplemented"
+    | head :: tail ->
+        translate_pattern head ~next_term:(expr_with_args_popped tail)
+    | [] -> push_expr expr ~next_term:(Jump Star)
   in
   match patterns with
-  (* Single identifier is bound to expression that is evaluated immediately. *)
-  | [ { kind = Identifier identifier; _ } ] ->
-      push_expr expr ~next_term:(Pop (Lambda, identifier, Grouping next_term))
-  (* Function with a bound expression that is evaluated only when the function
-      is called. *)
-  | { kind = Identifier identifier; _ } :: arguments ->
+  (* Bind an expression that is evaluated immediately. *)
+  | [ pattern ] ->
+      push_expr expr ~next_term:(translate_pattern pattern ~next_term)
+  (* Bind a function that is evaluated only when called. *)
+  | pattern :: arguments ->
       Push
         ( expr_with_args_popped arguments,
           Lambda,
-          Pop (Lambda, identifier, Grouping next_term) )
-  | _ -> failwith "unimplemented"
+          translate_pattern pattern ~next_term )
+  | [] -> failwith "Expected let binding to contain at least one pattern."
 
 let translate nodes =
   let rec translate_tracking_main ?main_expr = function
-    (* Main let binding and its the last node in the input list. *)
-    | [ { kind = Let ([ { kind = Identifier "main"; _ } ], _, expr); _ } ] ->
-        eval_expr expr
-    (* Main let binding but more AST nodes follow it. *)
+    (* Identify the main function. *)
     | { kind = Let ([ { kind = Identifier "main"; _ } ], _, expr); _ } :: tail
       ->
         translate_tracking_main ~main_expr:expr tail
-    (* Normal let binding. *)
+    (* Translate all other bindings. *)
     | { kind = Let (patterns, _, expr); _ } :: tail ->
         translate_let patterns expr
           ~next_term:(translate_tracking_main ?main_expr tail)
+    (* Once all nodes are traversed, insert the translated main function at the
+       end. *)
     | [] ->
         main_expr |> Option.map eval_expr |> Option.value ~default:(Jump Star)
     | _ -> failwith "unimplemented"

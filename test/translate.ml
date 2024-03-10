@@ -89,7 +89,7 @@ let tests =
              ( "let identity x : int -> int = x in identity 5",
                "[<x>.([x])].<identity>.([5].identity)" );
              ( "let sub x y : int int -> int = x - y in sub (5 + 1) 2",
-               "[<x>.<y>.([y].[x].-)].<sub>.([2].[1].[5].+; sub)" );
+               "[<x>.(<y>.([y].[x].-))].<sub>.([2].[1].[5].+; sub)" );
            ]
        @ test_translate_top_levels "main"
            [
