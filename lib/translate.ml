@@ -14,7 +14,7 @@ let next_incremental_variable s =
 
 let lexeme_to_location s = Loc (String.sub s 1 (String.length s - 1))
 
-let translate_pattern (pattern : Pattern.t) ~next_term =
+let rec translate_pattern (pattern : Pattern.t) ~next_term =
   match pattern.kind with
   | Identifier identifier -> Pop (Lambda, identifier, Grouping next_term)
   | Constructor (_identifier, _pattern_opt) -> failwith "unimplemented"
@@ -40,7 +40,7 @@ let rec translate_expr (expr : Expr.t) =
   match expr.kind with
   | LetIn (patterns, _, bound_expr, body_expr) ->
       translate_let_in patterns bound_expr body_expr
-  | Match _ -> failwith "unimplemented"
+  | Match (expr, arms) -> translate_match expr arms
   | IfThenElse (condition, then_expr, else_expr) ->
       translate_if_then_else condition then_expr else_expr
   | BinOp (op, lhs, rhs) -> translate_bin_op op lhs rhs
@@ -78,6 +78,8 @@ and push_expr_to_specific_location (expr : Expr.t) location ~next_term =
 and translate_let_in patterns bound_expr body_expr =
   translate_let patterns bound_expr
     ~next_term:(push_expr body_expr ~next_term:(Jump Star))
+
+and translate_match _expr _arms = failwith "unimplemented"
 
 and translate_if_then_else condition then_expr else_expr =
   let condition_term = eval_expr condition in
