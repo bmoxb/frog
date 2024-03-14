@@ -14,7 +14,7 @@ type kind =
   | Colon (* : *)
   | Semicolon (* ; *)
   | Comma (* TODO: Currently unused but may be used for multiple return vals. *)
-  | Exclamation (* ! *)
+  | Exclamation (* TODO: Also unused - could replace not keyword? *)
   | NotEquiv (* != *)
   | GreaterThan (* > *)
   | GreaterThanOrEqual (* >= *)
