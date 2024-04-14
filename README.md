@@ -8,17 +8,6 @@ The compiler is handwritten in OCaml.
 
 ## TODO
 
-* [ ] Implement semantic analysis.
-  * [ ] Type checking.
-    * [ ] Are all let bindings assigned values of the specified type?
-    * [ ] Do all paths of match and if-then-else expressions return values of
-      the same type?
-    * [ ] Is function application performed with arguments of the correct
-      types?
-    * [ ] Are values of the correct types pushed to locations?
-    * [ ] Are arguments to built-in operators (+, -, etc.) of the correct
-      types?
-  * [ ] Ensure pattern matching covers all cases.
 * [ ] Translation to FMC terms.
   * [ ] Expressions.
     * [x] Primary expressions.
@@ -32,6 +21,12 @@ The compiler is handwritten in OCaml.
     * [x] Top-level let.
     * [ ] Data definition.
   * [ ] Recursive functions.
+* [ ] Additions based on FMC.
+  * [ ] Multiple return values from functions.
+  * [ ] TODO: What else?
+* [ ] Lower priority improvements.
+  * [ ] Ensure pattern matching covers all cases (form of semantic analysis).
+  * [ ] Insert type information into FMC text format.
   * [ ] Proper handling of patterns including in let bindings.
   * [ ] Handle unit properly.
 
