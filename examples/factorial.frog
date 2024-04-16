@@ -8,5 +8,6 @@ let factorial input : int -> int =
     factorial_accumulate input 1
 
 let main : @in -> @out =
+    @out "n = ";
     let input : int = @in in
-    @out (factorial input)
+    @out "\n" "n! = " (factorial input)

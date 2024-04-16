@@ -6,12 +6,6 @@ let fib n : int -> int =
     loop 0 1 n
 
 let main : @in -> @out =
-    let loop n : int -> int =
-        if n > 0 then
-            @out (string_of_int (fib 10));
-            loop (n - 1)
-        else
-            @out "end"
-    in
+    @out "n = ";
     let input : int = @in in
-    @out (fib input)
+    @out "\n" "F_n = " (fib input)
