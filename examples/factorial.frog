@@ -1,4 +1,6 @@
+# Calculate the factorial of a given integer.
 let factorial input : int -> int =
+    # Recursive calls must be in the tail position so use an accumulator.
     let factorial_accumulate n accum : int int -> int =
         if n > 1 then
             factorial_accumulate (n - 1) (n * accum)
