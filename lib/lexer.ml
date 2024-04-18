@@ -21,6 +21,15 @@ let peek lexer =
 let advance lexer =
   { lexer with pos = { lexer.pos with finish = lexer.pos.finish + 1 } }
 
+(* Continually advance while the given condition remains true. *)
+let rec advance_while should_advance lexer =
+  match peek lexer with
+  | Some peeked when should_advance peeked ->
+      lexer |> advance |> advance_while should_advance
+  | _ -> lexer
+
+(* Advance if the condition is true and return the if_match token type.
+   Otherwise, do not advance and return the otherwise token type. *)
 let conditionally_advance cond ~if_match ~otherwise lexer =
   match peek lexer with
   | Some peeked when cond peeked -> (advance lexer, if_match)
@@ -85,10 +94,12 @@ let token_kind c lexer =
   | c when is_identifier c -> handle_identifier lexer
   | _ -> Err.raise_lexical_error c lexer.pos
 
-(* Advance until the first non-whitespace character is found (or EOF). *)
-let rec skip_whitespace lexer =
+(* Discard whitespace characters and comments. *)
+let rec discard_characters lexer =
   match peek lexer with
-  | Some peeked when is_whitespace peeked -> lexer |> advance |> skip_whitespace
+  | Some '#' -> lexer |> advance_while (( <> ) '\n') |> discard_characters
+  | Some peeked when is_whitespace peeked ->
+      lexer |> advance_while is_whitespace |> discard_characters
   | _ -> lexer
 
 (* Set the lexer's internal start position to the end position value. *)
@@ -97,7 +108,7 @@ let reset_start_position lexer =
   { lexer with pos = { start = offset; finish = offset } }
 
 let token lexer =
-  let lexer = lexer |> skip_whitespace |> reset_start_position in
+  let lexer = lexer |> discard_characters |> reset_start_position in
   peek lexer
   |> Option.map (fun c ->
          let lexer, kind = token_kind c lexer in

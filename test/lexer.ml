@@ -122,5 +122,9 @@ let tests =
                { kind = Token.StringLiteral; pos = { start = 5; finish = 14 } };
              ];
          ]
+       @ [
+           test_valid_token "ignore comments" "\n#hello\n#world\n if"
+             { kind = Token.IfKeyword; pos = { start = 16; finish = 18 } };
+         ]
 
 let () = run_test_tt_main tests
