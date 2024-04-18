@@ -24,7 +24,7 @@ let advance lexer =
 (* Continually advance while the given condition remains true. *)
 let rec advance_while should_advance lexer =
   match peek lexer with
-  | Some peeked when should_advance peeked ->
+  | Some c when should_advance c ->
       lexer |> advance |> advance_while should_advance
   | _ -> lexer
 
@@ -32,7 +32,7 @@ let rec advance_while should_advance lexer =
    Otherwise, do not advance and return the otherwise token type. *)
 let conditionally_advance cond ~if_match ~otherwise lexer =
   match peek lexer with
-  | Some peeked when cond peeked -> (advance lexer, if_match)
+  | Some c when cond c -> (advance lexer, if_match)
   | _ -> (lexer, otherwise)
 
 let rec handle_string lexer =
@@ -43,16 +43,14 @@ let rec handle_string lexer =
 
 let rec handle_number ?(is_decimal = false) lexer =
   match peek lexer with
-  | Some peeked when is_digit peeked ->
-      lexer |> advance |> handle_number ~is_decimal
+  | Some c when is_digit c -> lexer |> advance |> handle_number ~is_decimal
   | Some '.' when not is_decimal ->
       lexer |> advance |> handle_number ~is_decimal:true
   | _ -> (lexer, Token.NumberLiteral)
 
 let rec handle_identifier lexer =
   match peek lexer with
-  | Some peeked when is_identifier peeked ->
-      lexer |> advance |> handle_identifier
+  | Some c when is_identifier c -> lexer |> advance |> handle_identifier
   | _ ->
       let lexeme = Position.substring lexer.source_code lexer.pos in
       (lexer, Token.lookup_identifier_or_keyword lexeme)
@@ -94,11 +92,12 @@ let token_kind c lexer =
   | c when is_identifier c -> handle_identifier lexer
   | _ -> Err.raise_lexical_error c lexer.pos
 
-(* Discard whitespace characters and comments. *)
+(* Discard whitespace characters and comments (which start with a '#' and end
+   with a newline. *)
 let rec discard_characters lexer =
   match peek lexer with
   | Some '#' -> lexer |> advance_while (( <> ) '\n') |> discard_characters
-  | Some peeked when is_whitespace peeked ->
+  | Some c when is_whitespace c ->
       lexer |> advance_while is_whitespace |> discard_characters
   | _ -> lexer
 
