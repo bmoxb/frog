@@ -100,6 +100,13 @@ let tests =
              ( "let sub x y : int int -> int = x - y in sub (5 + 1) 2",
                "[<x>.(<y>.([y].[x].-))].<sub>.([2].[1].[5].+; sub)" );
            ]
+       @ test_translate_exprs "match"
+           [
+             ( "match x with Some n -> n + 1 | None -> 0",
+               "x; Some -> (<n>.[1].[n].+); None -> ([0])" );
+             ( "match list with Cons head tail -> head |  Nil -> 0",
+               "list; Cons -> (<tail>.(<head>.[head])); Nil -> ([0])" );
+           ]
        @ test_translate_top_levels "main"
            [
              ("let main : int = 10", "10");
