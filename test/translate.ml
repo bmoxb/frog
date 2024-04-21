@@ -104,7 +104,7 @@ let tests =
            [
              ( "match x with Some n -> n + 1 | None -> 0",
                "x; Some -> (<n>.[1].[n].+); None -> ([0])" );
-             ( "match list with Cons head tail -> head |  Nil -> 0",
+             ( "match list with Cons num tail -> head | Nil -> 0",
                "list; Cons -> (<tail>.(<head>.[head])); Nil -> ([0])" );
            ]
        @ test_translate_top_levels "main"

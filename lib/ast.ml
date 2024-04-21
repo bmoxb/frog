@@ -258,25 +258,24 @@ module Expr = struct
          (Printf.sprintf "arm %d" index))
 end
 
-(* IDENTFIER [ type ] *)
-type data_arm = Position.t * identifier * DataType.t option [@@deriving show]
+(* IDENTFIER { type } *)
+type data_arm = Position.t * identifier * DataType.t list [@@deriving show]
 
-let data_arm_to_edge index (_, constructor_identifier, data_type_opt) =
+let data_arm_to_edge index (_, constructor_identifier, parameter_types) =
   let constructor_edge =
     Tree.edge ~label:"constructor identifier"
       (Tree.vertex constructor_identifier)
   in
-  (* If the data type is some, then this is a single edge in a list.
-     Otherwise, this is an empty list. *)
-  let data_type_edge_list =
-    data_type_opt
-    |> Option.map (fun data_type ->
-           [ data_type |> DataType.to_tree_vertex |> Tree.edge ])
-    |> Option.value ~default:[]
+  let parameter_type_edges =
+    parameter_types
+    |> List.mapi (fun i data_type ->
+           Tree.edge
+             ~label:(Printf.sprintf "parameter type %d" i)
+             (DataType.to_tree_vertex data_type))
   in
   Tree.edge
     (Tree.vertex
-       ~edges:(constructor_edge :: data_type_edge_list)
+       ~edges:(constructor_edge :: parameter_type_edges)
        (Printf.sprintf "arm %d" index))
 
 type kind =

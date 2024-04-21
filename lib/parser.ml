@@ -417,20 +417,17 @@ let let_binding parser =
   in
   (parser, node)
 
-(* data_arm = CAPITALISED_IDENTIFIER [ type ] *)
+(* data_arm = CAPITALISED_IDENTIFIER { type } *)
 let data_arm parser =
   let parser, token =
     expect_kind Token.CapitalisedIdentifier "Expected a constructor identifier."
       parser
   in
   let identifier = Token.lexeme parser.source_code token in
-  match data_type parser with
-  | Some (parser, data_type) ->
-      let (pos : Position.t) =
-        { start = token.pos.start; finish = data_type.pos.finish }
-      in
-      (parser, (pos, identifier, Some data_type))
-  | None -> (parser, (token.pos, identifier, None))
+  let parser, last_opt, parameter_types = any_number_of simple_type parser in
+  let finish = (last_opt |> Option.value ~default:token).pos.finish in
+  let (pos : Position.t) = { start = token.pos.start; finish } in
+  (parser, (pos, identifier, parameter_types))
 
 (* data = "data" IDENTIFIER "=" [ "|" ] data_arm { "|" data_arm } *)
 let data_definition parser =

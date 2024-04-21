@@ -14,7 +14,7 @@ let next_incremental_variable s =
 
 let lexeme_to_location s = Loc (String.sub s 1 (String.length s - 1))
 
-let rec translate_pattern (pattern : Pattern.t) ~next_term =
+let translate_pattern (pattern : Pattern.t) ~next_term =
   match pattern.kind with
   | Identifier identifier -> Pop (Lambda, identifier, Grouping next_term)
   | Constructor (_identifier, _pattern_opt) -> failwith "unimplemented"
