@@ -33,6 +33,7 @@ let expect_or_syntax_error rule error_msg parser =
 (* Parse using a rule any number (0 or more) times. Returns the last node (if
     any) along with the list of all nodes. *)
 let any_number_of rule parser =
+  (* TODO: last isn't set. *)
   let rec traverse ~last parser =
     match rule parser with
     | Some (parser, head) ->
@@ -115,15 +116,51 @@ and simple_type parser =
 and expect_simple_type parser =
   expect_or_syntax_error simple_type "Expected a simple type." parser
 
-(* pattern = identifier_pattern | type_constructor_pattern | literal_pattern *)
+(* pattern = constructor_pattern | primary_pattern *)
 let rec pattern parser =
   Option.bind (peek_kind parser) (function
+    | CapitalisedIdentifier -> Some (constructor_pattern parser)
+    | _ -> primary_pattern parser)
+
+(* primary_pattern = identifier_pattern | "(" pattern ")" *)
+and primary_pattern parser =
+  Option.bind (peek_kind parser) (function
     | Identifier -> Some (identifier_pattern parser)
-    | CapitalisedIdentifier -> Some (type_constructor_pattern parser)
-    | NumberLiteral | StringLiteral -> Some (literal_pattern parser)
+    | OpenBracket -> Some (grouping_pattern parser)
     | _ -> None)
 
-(* identifier_pattern = IDENTIFER *)
+(* grouping_pattern = "(" pattern ")" *)
+and grouping_pattern parser =
+  let parser, open_token = advance parser in
+  let parser, pattern = expect_pattern parser in
+  let parser, close_token =
+    expect_kind CloseBracket "Expected closing ')' token." parser
+  in
+  let node : Ast.Pattern.t =
+    {
+      pos = { start = open_token.pos.start; finish = close_token.pos.finish };
+      kind = Ast.Pattern.Grouping pattern;
+    }
+  in
+  (parser, node)
+
+(* constructor_pattern = CAPITALISED_IDENTIFIER { pattern } *)
+and constructor_pattern parser =
+  let parser, token = advance parser in
+  let identifier = Token.lexeme parser.source_code token in
+  let parser, last_opt, parameter_patterns =
+    any_number_of primary_pattern parser
+  in
+  let finish = (last_opt |> Option.value ~default:token).pos.finish in
+  let node : Ast.Pattern.t =
+    {
+      pos = { start = token.pos.start; finish };
+      kind = Ast.Pattern.Constructor (identifier, parameter_patterns);
+    }
+  in
+  (parser, node)
+
+(* identifier_pattern = IDENTIFIER *)
 and identifier_pattern parser =
   let parser, token = advance parser in
   let identifier = Token.lexeme parser.source_code token in
@@ -132,35 +169,7 @@ and identifier_pattern parser =
   in
   (parser, node)
 
-(* type_constructor_pattern = CAPITALISED_IDENTIFIER [ pattern ] *)
-and type_constructor_pattern parser =
-  let parser, token = advance parser in
-  let identifier = Token.lexeme parser.source_code token in
-  match pattern parser with
-  | Some (parser, argument) ->
-      let node : Ast.Pattern.t =
-        {
-          pos = { start = token.pos.start; finish = argument.pos.finish };
-          kind = Ast.Pattern.TypeConstructor (identifier, Some argument);
-        }
-      in
-      (parser, node)
-  | None ->
-      let node : Ast.Pattern.t =
-        {
-          pos = token.pos;
-          kind = Ast.Pattern.TypeConstructor (identifier, None);
-        }
-      in
-      (parser, node)
-
-(* literal_pattern = NUMBER_LITERAL | STRING_LITERAL *)
-and literal_pattern parser =
-  let parser, token = advance parser in
-  let literal = Token.lexeme parser.source_code token in
-  (parser, { pos = token.pos; kind = Ast.Pattern.Literal literal })
-
-let expect_pattern parser =
+and expect_pattern parser =
   expect_or_syntax_error pattern "Expected a pattern." parser
 
 (* expr = core_expr [ ";" expr ] *)
@@ -324,7 +333,7 @@ and application parser =
     (parser, node)
 
 (* primary = NUMBER_LITERAL | STRING_LITERAL | IDENTIFIER | LOCATION_IDENTIFIER
-           | grouping *)
+           | CAPITALISED_IDENTIFIER | grouping *)
 and primary parser =
   match Option.bind (peek_kind parser) Ast.Expr.token_kind_to_primary_kind with
   | Some primary_kind ->

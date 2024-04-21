@@ -7,8 +7,8 @@ module Pattern = struct
 
   and kind =
     | Identifier of identifier
-    | TypeConstructor of identifier * t option
-    | Literal of string
+    | Grouping of t
+    | Constructor of identifier * t list
   [@@deriving show]
 
   let rec to_tree_vertex pattern =
@@ -16,19 +16,19 @@ module Pattern = struct
       match pattern.kind with
       | Identifier identifier ->
           ("identifier", [ Tree.edge (Tree.vertex identifier) ])
-      | TypeConstructor (identifier, pattern_opt) ->
-          (* If pattern_opt is some then this is a list with a single edge.
-             Otherwise, it is an empty list. *)
-          let pattern_edge_list =
-            pattern_opt
-            |> Option.map (fun pattern ->
-                   [ Tree.edge ~label:"argument" (to_tree_vertex pattern) ])
-            |> Option.value ~default:[]
+      | Grouping pattern ->
+          ("grouping", [ Tree.edge ~label:"pattern" (to_tree_vertex pattern) ])
+      | Constructor (identifier, parameter_patterns) ->
+          let parameter_edges =
+            parameter_patterns
+            |> List.mapi (fun index pattern ->
+                   Tree.edge
+                     ~label:(Printf.sprintf "parameter %d" index)
+                     (to_tree_vertex pattern))
           in
           ( "type constructor",
             Tree.edge ~label:"identifier" (Tree.vertex identifier)
-            :: pattern_edge_list )
-      | Literal literal -> ("literal", [ Tree.edge (Tree.vertex literal) ])
+            :: parameter_edges )
     in
     Tree.vertex ~colour:(Tree.rgb 1.0 0.75 0.8) ~edges label
 
@@ -131,7 +131,12 @@ module Expr = struct
 
   let display_unary_operator = function Not -> "not" | Negate -> "-"
 
-  type primary_kind = NumberLiteral | StringLiteral | Identifier | Location
+  type primary_kind =
+    | NumberLiteral
+    | StringLiteral
+    | Identifier
+    | Location
+    | Constructor
   [@@deriving show]
 
   let token_kind_to_primary_kind = function
@@ -139,6 +144,7 @@ module Expr = struct
     | Token.StringLiteral -> Some StringLiteral
     | Token.Identifier -> Some Identifier
     | Token.LocationIdentifier -> Some Location
+    | Token.CapitalisedIdentifier -> Some Constructor
     | _ -> None
 
   let display_primary_kind = function
@@ -146,6 +152,7 @@ module Expr = struct
     | StringLiteral -> "string literal"
     | Identifier -> "identifier"
     | Location -> "location"
+    | Constructor -> "constructor"
 
   type t = { pos : Position.t; kind : kind } [@@deriving show]
 

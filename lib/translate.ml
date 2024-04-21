@@ -6,8 +6,8 @@ let lexeme_to_location s = Loc (String.sub s 1 (String.length s - 1))
 let translate_pattern (pattern : Pattern.t) ~next_term =
   match pattern.kind with
   | Identifier identifier -> Pop (Lambda, identifier, Grouping next_term)
-  | TypeConstructor (_identifier, _pattern_opt) -> failwith "unimplemented"
-  | Literal _lexeme -> failwith "unimplemented"
+  | Constructor (_identifier, _pattern_opt) -> failwith "unimplemented"
+  | Grouping _ -> failwith "unimplemented"
 
 let eval_primary kind lexeme =
   match kind with
