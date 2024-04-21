@@ -1,3 +1,12 @@
-data int_list = Nil | Cons int int_list
+data list = Cons int list | Nil
 
-TODO
+let is_second_element n head : int list -> bool =
+    match head with
+    | Cons n (Cons m tail) -> m == head
+    | Cons n (Nil)           -> False
+    | Nil                    -> False
+
+let main : @in -> @out =
+    let input : int = @in in
+    let l : list = Cons 1 (Cons 2 (Cons 3 Nil)) in
+    @out (is_second_element input l)
