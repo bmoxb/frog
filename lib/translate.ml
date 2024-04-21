@@ -1,7 +1,7 @@
 open Fmc
 open Ast
 
-let next_unique_identifier s =
+let next_incremental_variable s =
   let len = String.length s in
   let rec traverse index =
     if s.[index] = 'z' then
@@ -23,16 +23,13 @@ let translate_pattern (pattern : Pattern.t) ~next_term =
 (* Evaluate/execute a primary expression. *)
 let eval_primary kind lexeme =
   match kind with
-  | Expr.Location ->
-      (* TODO: variable name *)
-      Pop (lexeme_to_location lexeme, "x", Variable "x")
+  | Expr.Location -> Pop (lexeme_to_location lexeme, "x", Variable "x")
   | _ -> Variable lexeme
 
 (* Push a primary expression and continue with the specified term. *)
 let push_primary ?(location = Lambda) kind lexeme ~next_term =
   match kind with
   | Expr.Location ->
-      (* TODO: variable name *)
       Pop
         ( lexeme_to_location lexeme,
           "x",
@@ -105,7 +102,7 @@ and translate_application fn args =
   | Primary (Expr.Location, lexeme) ->
       translate_location_application (lexeme_to_location lexeme) args
   | Primary (Expr.Constructor, lexeme) ->
-      translate_constructor_application (Jmp lexeme) (List.rev args) []
+      translate_constructor_application (Jmp lexeme) (List.rev args)
   | _ -> translate_function_application fn (List.rev args)
 
 and translate_location_application location (args : Expr.t list) =
@@ -115,21 +112,21 @@ and translate_location_application location (args : Expr.t list) =
         ~next_term:(translate_location_application location tail)
   | [] -> Jump Star
 
-and translate_constructor_application jmp (args : Expr.t list) vars_to_push =
+and translate_constructor_application jmp (args : Expr.t list) =
   let rec jump_with_args_pushed = function
     | var :: tail -> Push (Variable var, Lambda, jump_with_args_pushed tail)
     | [] -> Jump jmp
   in
-  match args with
-  | expr :: tail ->
-      (* TODO *)
-      let var = "a" in
-      let next_arg_term =
-        Grouping
-          (translate_constructor_application jmp tail (var :: vars_to_push))
-      in
-      push_expr expr ~next_term:(Pop (Lambda, var, next_arg_term))
-  | [] -> Push (jump_with_args_pushed vars_to_push, Lambda, Jump Star)
+  let rec prepare_args_and_push_jump var vars_to_push = function
+    | expr :: tail ->
+        let next_var = next_incremental_variable var in
+        let next_arg_term =
+          prepare_args_and_push_jump next_var (var :: vars_to_push) tail
+        in
+        push_expr expr ~next_term:(Pop (Lambda, var, Grouping next_arg_term))
+    | [] -> Push (jump_with_args_pushed vars_to_push, Lambda, Jump Star)
+  in
+  prepare_args_and_push_jump "a" [] args
 
 and translate_function_application fn = function
   | expr :: tail ->
