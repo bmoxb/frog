@@ -1,6 +1,17 @@
 open Fmc
 open Ast
 
+let next_unique_identifier s =
+  let len = String.length s in
+  let rec traverse index =
+    if s.[index] = 'z' then
+      if index = len - 1 then String.make (len + 1) 'a' else traverse (index + 1)
+    else
+      let open Char in
+      String.mapi (fun i c -> if i = index then chr (code c + 1) else c) s
+  in
+  traverse 0
+
 let lexeme_to_location s = Loc (String.sub s 1 (String.length s - 1))
 
 let translate_pattern (pattern : Pattern.t) ~next_term =
@@ -9,6 +20,7 @@ let translate_pattern (pattern : Pattern.t) ~next_term =
   | Constructor (_identifier, _pattern_opt) -> failwith "unimplemented"
   | Grouping _ -> failwith "unimplemented"
 
+(* Evaluate/execute a primary expression. *)
 let eval_primary kind lexeme =
   match kind with
   | Expr.Location ->
@@ -16,6 +28,7 @@ let eval_primary kind lexeme =
       Pop (lexeme_to_location lexeme, "x", Variable "x")
   | _ -> Variable lexeme
 
+(* Push a primary expression and continue with the specified term. *)
 let push_primary ?(location = Lambda) kind lexeme ~next_term =
   match kind with
   | Expr.Location ->
@@ -88,38 +101,40 @@ and translate_unary_op op expr =
       push_expr expr ~next_term:(Push (Variable "0", Lambda, Variable "-"))
 
 and translate_application fn args =
-  let rec function_application = function
-    | expr :: tail -> push_expr expr ~next_term:(function_application tail)
-    | [] -> eval_expr fn
-  in
-  let rec apply_location location (args : Expr.t list) =
-    match args with
-    | expr :: tail ->
-        push_expr_to_specific_location expr location
-          ~next_term:(apply_location location tail)
-    | [] -> Jump Star
-  in
-  let rec apply_constructor jmp (args : Expr.t list) vars_to_push =
-    let rec jump_with_args_pushed = function
-      | var :: tail -> Push (Variable var, Lambda, jump_with_args_pushed tail)
-      | [] -> Jump jmp
-    in
-    match args with
-    | expr :: tail ->
-        (* TODO *)
-        let var = "a" in
-        let next_arg_term =
-          Grouping (apply_constructor jmp tail (var :: vars_to_push))
-        in
-        push_expr expr ~next_term:(Pop (Lambda, var, next_arg_term))
-    | [] -> Push (jump_with_args_pushed vars_to_push, Lambda, Jump Star)
-  in
   match fn.kind with
   | Primary (Expr.Location, lexeme) ->
-      apply_location (lexeme_to_location lexeme) args
+      translate_location_application (lexeme_to_location lexeme) args
   | Primary (Expr.Constructor, lexeme) ->
-      apply_constructor (Jmp lexeme) (List.rev args) []
-  | _ -> function_application (List.rev args)
+      translate_constructor_application (Jmp lexeme) (List.rev args) []
+  | _ -> translate_function_application fn (List.rev args)
+
+and translate_location_application location (args : Expr.t list) =
+  match args with
+  | expr :: tail ->
+      push_expr_to_specific_location expr location
+        ~next_term:(translate_location_application location tail)
+  | [] -> Jump Star
+
+and translate_constructor_application jmp (args : Expr.t list) vars_to_push =
+  let rec jump_with_args_pushed = function
+    | var :: tail -> Push (Variable var, Lambda, jump_with_args_pushed tail)
+    | [] -> Jump jmp
+  in
+  match args with
+  | expr :: tail ->
+      (* TODO *)
+      let var = "a" in
+      let next_arg_term =
+        Grouping
+          (translate_constructor_application jmp tail (var :: vars_to_push))
+      in
+      push_expr expr ~next_term:(Pop (Lambda, var, next_arg_term))
+  | [] -> Push (jump_with_args_pushed vars_to_push, Lambda, Jump Star)
+
+and translate_function_application fn = function
+  | expr :: tail ->
+      push_expr expr ~next_term:(translate_function_application fn tail)
+  | [] -> eval_expr fn
 
 and translate_let patterns expr ~next_term =
   let rec expr_with_args_popped args =

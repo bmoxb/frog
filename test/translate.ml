@@ -61,7 +61,7 @@ let tests =
              ("None", "[None]");
              ("Some 10", "[10].<a>.([[a].Some])");
              ("Some (10 + x)", "[x].[10].+; <a>.([[a].Some])");
-             "Cons 10 (Cons 20 Nil)";
+             ("Cons 10 (Cons 20 Nil)", "");
            ]
        @ test_translate_exprs "location push"
            [
