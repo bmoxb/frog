@@ -92,16 +92,33 @@ and translate_application fn args =
     | expr :: tail -> push_expr expr ~next_term:(function_application tail)
     | [] -> eval_expr fn
   in
-  let rec location_push location (args : Expr.t list) =
+  let rec apply_location location (args : Expr.t list) =
     match args with
     | expr :: tail ->
         push_expr_to_specific_location expr location
-          ~next_term:(location_push location tail)
+          ~next_term:(apply_location location tail)
     | [] -> Jump Star
+  in
+  let rec apply_constructor jmp (args : Expr.t list) vars_to_push =
+    let rec jump_with_args_pushed = function
+      | var :: tail -> Push (Variable var, Lambda, jump_with_args_pushed tail)
+      | [] -> Jump jmp
+    in
+    match args with
+    | expr :: tail ->
+        (* TODO *)
+        let var = "a" in
+        let next_arg_term =
+          Grouping (apply_constructor jmp tail (var :: vars_to_push))
+        in
+        push_expr expr ~next_term:(Pop (Lambda, var, next_arg_term))
+    | [] -> Push (jump_with_args_pushed vars_to_push, Lambda, Jump Star)
   in
   match fn.kind with
   | Primary (Expr.Location, lexeme) ->
-      location_push (lexeme_to_location lexeme) args
+      apply_location (lexeme_to_location lexeme) args
+  | Primary (Expr.Constructor, lexeme) ->
+      apply_constructor (Jmp lexeme) (List.rev args) []
   | _ -> function_application (List.rev args)
 
 and translate_let patterns expr ~next_term =
