@@ -56,6 +56,15 @@ let tests =
              ("f 1 + 2", "[2].[1].f; +");
              ("f (g 10) (g (2 + x))", "[x].[2].+; g; [10].g; f");
            ]
+       @ test_translate_exprs "data constructor"
+           [
+             ("None", "[None]");
+             ("Some 10", "[10].<a>.([[a].Some])");
+             ("Some (10 + x)", "[x].[10].+; <a>.([[a].Some])");
+             ( "Cons 10 (Cons 20 Nil)",
+               "[Nil].<a>.([20].<b>.([[b].[a].Cons])); \
+                <a>.([10].<b>.([[b].[a].Cons]))" );
+           ]
        @ test_translate_exprs "location push"
            [
              ("@stdout \"hello\"", "[\"hello\"]stdout");
