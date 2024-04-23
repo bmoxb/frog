@@ -14,12 +14,6 @@ let next_incremental_variable s =
 
 let lexeme_to_location s = Loc (String.sub s 1 (String.length s - 1))
 
-let translate_pattern (pattern : Pattern.t) ~next_term =
-  match pattern.kind with
-  | Identifier identifier -> Pop (Lambda, identifier, Grouping next_term)
-  | Constructor (_identifier, _pattern_opt) -> failwith "unimplemented"
-  | Grouping _ -> failwith "unimplemented"
-
 (* Evaluate/execute a primary expression. *)
 let eval_primary kind lexeme =
   match kind with
@@ -38,11 +32,11 @@ let push_primary ?(location = Lambda) kind lexeme ~next_term =
 
 let rec translate_expr (expr : Expr.t) =
   match expr.kind with
-  | LetIn (patterns, _, bound_expr, body_expr) ->
-      translate_let_in patterns bound_expr body_expr
+  | LetIn { info; bound_expr; in_expr } ->
+      translate_let_in info bound_expr in_expr
   | Match (expr, arms) -> translate_match expr arms
-  | IfThenElse (condition, then_expr, else_expr) ->
-      translate_if_then_else condition then_expr else_expr
+  | IfThenElse { condition_expr; then_expr; else_expr } ->
+      translate_if_then_else condition_expr then_expr else_expr
   | BinOp (op, lhs, rhs) -> translate_bin_op op lhs rhs
   | UnaryOp (op, expr) -> translate_unary_op op expr
   | Application (fn, args) -> translate_application fn args
@@ -75,14 +69,27 @@ and push_expr_to_specific_location (expr : Expr.t) location ~next_term =
           Star,
           Pop (Lambda, "x", Push (Variable "x", location, next_term)) )
 
-and translate_let_in patterns bound_expr body_expr =
-  translate_let patterns bound_expr
-    ~next_term:(push_expr body_expr ~next_term:(Jump Star))
+and translate_let_in info bound_expr in_expr =
+  translate_let info bound_expr
+    ~next_term:(push_expr in_expr ~next_term:(Jump Star))
 
-and translate_match _expr _arms = failwith "unimplemented"
+and translate_match _expr _arms = failwith "TODO"
+(*
+  let rec translate_arms lhs_term = function
+    | { constructor; parameters; expr; _ } :: tail ->
+        (* TODO: Pop parameters. *)
+        let next_lhs_term =
+          Choice
+            (lhs_term, Jmp constructor, push_expr expr ~next_term:(Jump Star))
+        in
+        translate_arms next_lhs_term tail
+    | [] -> lhs_term
+  in
+  translate_arms (eval_expr expr) arms
+  *)
 
-and translate_if_then_else condition then_expr else_expr =
-  let condition_term = eval_expr condition in
+and translate_if_then_else condition_expr then_expr else_expr =
+  let condition_term = eval_expr condition_expr in
   Choice
     ( Choice
         (condition_term, Jmp "True", push_expr then_expr ~next_term:(Jump Star)),
@@ -135,39 +142,40 @@ and translate_function_application fn = function
       push_expr expr ~next_term:(translate_function_application fn tail)
   | [] -> eval_expr fn
 
-and translate_let patterns expr ~next_term =
+and translate_let info expr ~next_term =
+  let pop_and_continue identifier ~next_term =
+    Pop (Lambda, identifier, Grouping next_term)
+  in
   let rec expr_with_args_popped args =
     match args with
     | head :: tail ->
-        translate_pattern head ~next_term:(expr_with_args_popped tail)
+        pop_and_continue head ~next_term:(expr_with_args_popped tail)
     | [] -> push_expr expr ~next_term:(Jump Star)
   in
-  match patterns with
+  match info.parameters with
   (* Bind an expression that is evaluated immediately. *)
-  | [ pattern ] ->
-      push_expr expr ~next_term:(translate_pattern pattern ~next_term)
+  | [] -> push_expr expr ~next_term:(pop_and_continue info.name ~next_term)
   (* Bind a function that is evaluated only when called. *)
-  | pattern :: arguments ->
+  | parameters ->
       Push
-        ( expr_with_args_popped arguments,
+        ( expr_with_args_popped parameters,
           Lambda,
-          translate_pattern pattern ~next_term )
-  | [] -> failwith "Expected let binding to contain at least one pattern."
+          pop_and_continue info.name ~next_term )
 
 let translate nodes =
   let rec translate_tracking_main ?main_expr = function
     (* Identify the main function. *)
-    | { kind = Let ([ { kind = Identifier "main"; _ } ], _, expr); _ } :: tail
-      ->
+    | { kind = Let ({ name = "main"; _ }, expr); _ } :: tail ->
         translate_tracking_main ~main_expr:expr tail
     (* Translate all other bindings. *)
-    | { kind = Let (patterns, _, expr); _ } :: tail ->
-        translate_let patterns expr
+    | { kind = Let (info, expr); _ } :: tail ->
+        translate_let info expr
           ~next_term:(translate_tracking_main ?main_expr tail)
     (* Once all nodes are traversed, insert the translated main function at the
        end. *)
     | [] ->
         main_expr |> Option.map eval_expr |> Option.value ~default:(Jump Star)
-    | _ -> failwith "unimplemented"
+    (* Skip data definitions as they do not require translation. *)
+    | { kind = Data _; _ } :: tail -> translate_tracking_main ?main_expr tail
   in
   translate_tracking_main nodes

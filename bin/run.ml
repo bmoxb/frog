@@ -8,7 +8,9 @@ let debug_tokens path tokens =
   else ()
 
 let debug_ast path nodes =
-  let top_level_to_edge top_level = Tree.edge (Ast.to_tree_vertex top_level) in
+  let top_level_to_edge top_level =
+    Tree.edge (Astgraph.node_to_tree_vertex top_level)
+  in
   if path <> "" then
     let tree =
       Tree.vertex

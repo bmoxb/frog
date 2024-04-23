@@ -5,6 +5,10 @@ type identifier = string [@@deriving show]
 module DataType = struct
   type simple_kind = Identifier | Location [@@deriving show]
 
+  let display_simple_kind = function
+    | Identifier -> "identifier"
+    | Location -> "location"
+
   let token_kind_to_simple_kind = function
     | Token.Identifier -> Some Identifier
     | Token.LocationIdentifier -> Some Location
@@ -12,9 +16,21 @@ module DataType = struct
 
   type t = { pos : Position.t; kind : kind }
 
-  and kind = Simple of simple_kind * identifier | Function of t list * t list
+  and kind =
+    | Simple of simple_kind * identifier
+    | Function of { inputs : t list; outputs : t list }
   [@@deriving show]
 end
+
+type binding_info = {
+  name : identifier;
+  parameters : identifier list;
+  data_type : DataType.t;
+}
+[@@deriving show]
+(** Record holding all information associated with a let binding except the
+    bound expression itself (and the expression following 'in' in a let-in
+    binding expression. *)
 
 module Expr = struct
   type binary_operator =
@@ -31,6 +47,20 @@ module Expr = struct
     | Multiply
     | Divide
   [@@deriving show]
+
+  let display_binary_operator = function
+    | And -> "and"
+    | Or -> "or"
+    | Equiv -> "=="
+    | NotEquiv -> "!="
+    | GreaterThan -> ">"
+    | LessThan -> "<"
+    | GreaterThanOrEqual -> ">="
+    | LessThanOrEqual -> "<="
+    | Add -> "+"
+    | Subtract -> "-"
+    | Multiply -> "*"
+    | Divide -> "/"
 
   let token_kind_to_binary_operator = function
     | Token.AndKeyword -> Some And
@@ -49,6 +79,8 @@ module Expr = struct
 
   type unary_operator = Not | Negate [@@deriving show]
 
+  let display_unary_operator = function Not -> "not" | Negate -> "-"
+
   let token_kind_to_unary_operator = function
     | Token.NotKeyword -> Some Not
     | Token.Minus -> Some Negate
@@ -62,6 +94,13 @@ module Expr = struct
     | Constructor
   [@@deriving show]
 
+  let display_primary_kind = function
+    | NumberLiteral -> "number literal"
+    | StringLiteral -> "string literal"
+    | Identifier -> "identifier"
+    | Location -> "location"
+    | Constructor -> "constructor"
+
   let token_kind_to_primary_kind = function
     | Token.NumberLiteral -> Some NumberLiteral
     | Token.StringLiteral -> Some StringLiteral
@@ -74,11 +113,11 @@ module Expr = struct
 
   and kind =
     (* "let" IDENTIFIER { IDENTIFIER } ":" type "=" expr "in" expr *)
-    | LetIn of identifier * identifier list * DataType.t * t * t
+    | LetIn of { info : binding_info; bound_expr : t; in_expr : t }
     (* "match" expr "with" [ "|" ] match_arm { "|" match_arm } *)
     | Match of t * match_arm list
     (* "if" expr "then" expr "else" expr *)
-    | IfThenElse of t * t * t
+    | IfThenElse of { condition_expr : t; then_expr : t; else_expr : t }
     (* expr binary_operator expr *)
     | BinOp of binary_operator * t * t
     (* unary_operator expr *)
@@ -94,16 +133,26 @@ module Expr = struct
   [@@deriving show]
 
   (* CAPITALISED_IDENTIFIER { IDENTIFIER } "->" expr *)
-  and match_arm = Position.t * identifier * identifier list * t
+  and match_arm = {
+    arm_pos : Position.t;
+    constructor : identifier;
+    parameters : identifier list;
+    expr : t;
+  }
   [@@deriving show]
 end
 
 (* CAPITALISED_IDENTFIER { type } *)
-type data_arm = Position.t * identifier * DataType.t list [@@deriving show]
+type data_arm = {
+  arm_pos : Position.t;
+  constructor : identifier;
+  data_types : DataType.t list;
+}
+[@@deriving show]
 
 type kind =
   (* "let" IDENTIFIER { IDENTIFIER } ":" type "=" expr *)
-  | Let of identifier * identifier list * DataType.t * Expr.t
+  | Let of binding_info * Expr.t
   (* "data" IDENTIFIER "=" [ "|" ] data_arm { "|" data_arm } *)
   | Data of identifier * data_arm list
 [@@deriving show]

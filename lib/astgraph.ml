@@ -1,13 +1,10 @@
-let display_simple_kind =
-  let open Ast.DataType in
-  function Identifier -> "identifier" | Location -> "location"
-
 let rec data_type_to_tree_vertex (data_type : Ast.DataType.t) =
   let label, edges =
     match data_type.kind with
     | Simple (kind, identifier) ->
-        (display_simple_kind kind, [ Tree.edge (Tree.vertex identifier) ])
-    | Function (inputs, outputs) ->
+        ( Ast.DataType.display_simple_kind kind,
+          [ Tree.edge (Tree.vertex identifier) ] )
+    | Function { inputs; outputs } ->
         let data_type_to_edge data_type =
           Tree.edge (data_type_to_tree_vertex data_type)
         in
@@ -22,35 +19,6 @@ let rec data_type_to_tree_vertex (data_type : Ast.DataType.t) =
   in
   Tree.vertex ~colour:(Tree.rgb 1.0 0.1 0.1) ~edges label
 
-let display_binary_operator =
-  let open Ast.Expr in
-  function
-  | And -> "and"
-  | Or -> "or"
-  | Equiv -> "=="
-  | NotEquiv -> "!="
-  | GreaterThan -> ">"
-  | LessThan -> "<"
-  | GreaterThanOrEqual -> ">="
-  | LessThanOrEqual -> "<="
-  | Add -> "+"
-  | Subtract -> "-"
-  | Multiply -> "*"
-  | Divide -> "/"
-
-let display_unary_operator =
-  let open Ast.Expr in
-  function Not -> "not" | Negate -> "-"
-
-let display_primary_kind =
-  let open Ast.Expr in
-  function
-  | NumberLiteral -> "number literal"
-  | StringLiteral -> "string literal"
-  | Identifier -> "identifier"
-  | Location -> "location"
-  | Constructor -> "constructor"
-
 let function_parameters_to_edges =
   let parameter_to_edge index parameter =
     Tree.edge
@@ -60,25 +28,26 @@ let function_parameters_to_edges =
   List.mapi parameter_to_edge
 
 let rec expr_to_tree_vertex (expr : Ast.Expr.t) =
+  let open Ast.Expr in
   let label, edges =
     match expr.kind with
-    | LetIn (identifier, parameters, data_type, bound_expr, body_expr) ->
+    | LetIn { info = { name; parameters; data_type }; bound_expr; in_expr } ->
         ( "let-in",
-          Tree.edge ~label:"name" (Tree.vertex identifier)
+          Tree.edge ~label:"name" (Tree.vertex name)
           :: function_parameters_to_edges parameters
           @ [
               Tree.edge ~label:"type" (data_type_to_tree_vertex data_type);
               Tree.edge ~label:"bound expr" (expr_to_tree_vertex bound_expr);
-              Tree.edge ~label:"in" (expr_to_tree_vertex body_expr);
+              Tree.edge ~label:"in" (expr_to_tree_vertex in_expr);
             ] )
     | Match (expr, arms) ->
         ( "match",
           Tree.edge ~label:"expr" (expr_to_tree_vertex expr)
           :: match_arms_to_edges arms )
-    | IfThenElse (condition, then_expr, else_expr) ->
+    | IfThenElse { condition_expr; then_expr; else_expr } ->
         ( "if-then-else",
           [
-            Tree.edge ~label:"condition" (expr_to_tree_vertex condition);
+            Tree.edge ~label:"condition" (expr_to_tree_vertex condition_expr);
             Tree.edge ~label:"then" (expr_to_tree_vertex then_expr);
             Tree.edge ~label:"else" (expr_to_tree_vertex else_expr);
           ] )
@@ -130,18 +99,18 @@ let rec expr_to_tree_vertex (expr : Ast.Expr.t) =
   Tree.vertex ~colour:(Tree.rgb 0.1 0.1 1.0) ~edges label
 
 and match_arms_to_edges arms =
-  let match_arm_to_edge index (_, constructor, parameters, expr) =
+  let match_arm_to_edge index (arm : Ast.Expr.match_arm) =
     let constructor_edge =
-      Tree.edge ~label:"constructor" (Tree.vertex constructor)
+      Tree.edge ~label:"constructor" (Tree.vertex arm.constructor)
     in
     let parameter_edges =
-      parameters
+      arm.parameters
       |> List.mapi (fun index parameter ->
              Tree.edge
                ~label:(Printf.sprintf "parameter %d" index)
                (Tree.vertex parameter))
     in
-    let expr_edge = Tree.edge ~label:"expr" (expr_to_tree_vertex expr) in
+    let expr_edge = Tree.edge ~label:"expr" (expr_to_tree_vertex arm.expr) in
     Tree.edge
       (Tree.vertex
          ~edges:((constructor_edge :: parameter_edges) @ [ expr_edge ])
@@ -150,12 +119,12 @@ and match_arms_to_edges arms =
   List.mapi match_arm_to_edge arms
 
 let data_arms_to_edges =
-  let data_arm_to_edge index (_, constructor, parameter_types) =
+  let data_arm_to_edge index (arm : Ast.data_arm) =
     let constructor_edge =
-      Tree.edge ~label:"constructor" (Tree.vertex constructor)
+      Tree.edge ~label:"constructor" (Tree.vertex arm.constructor)
     in
     let parameter_type_edges =
-      parameter_types
+      arm.data_types
       |> List.mapi (fun i data_type ->
              Tree.edge
                ~label:(Printf.sprintf "parameter type %d" i)
@@ -171,9 +140,9 @@ let data_arms_to_edges =
 let node_to_tree_vertex (node : Ast.t) =
   let label, edges =
     match node.kind with
-    | Let (identifier, parameters, data_type, expr) ->
+    | Let ({ name; parameters; data_type }, expr) ->
         ( "let",
-          Tree.edge ~label:"name" (Tree.vertex identifier)
+          Tree.edge ~label:"name" (Tree.vertex name)
           :: function_parameters_to_edges parameters
           @ [
               Tree.edge ~label:"type" (data_type_to_tree_vertex data_type);
