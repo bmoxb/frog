@@ -28,9 +28,8 @@ type binding_info = {
   data_type : DataType.t;
 }
 [@@deriving show]
-(** Record holding all information associated with a let binding except the
-    bound expression itself (and the expression following 'in' in a let-in
-    binding expression. *)
+(** All information associated with a let binding except the bound expression
+    itself (and the expression following 'in' in a let-in expression). *)
 
 module Expr = struct
   type binary_operator =
