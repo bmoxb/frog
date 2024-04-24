@@ -1,6 +1,7 @@
 data list = Cons int list | Nil
 
 # Return true if the second element of the list is n, otherwise false.
+# Demonstrates nesting of match expressions.
 let is_second_element n head : int list -> bool =
     match head with
     | Cons _ next -> (match next with
@@ -8,7 +9,18 @@ let is_second_element n head : int list -> bool =
                       | Nil -> False)
     | Nil         -> False
 
+# Sum the values in a list.
+let sum list : list -> int =
+    # Recursive calls must be in the tail position so use an accumulator.
+    let with_accumulator l accum : list int -> int =
+        match list with
+        | Cons head tail -> with_accumulator tail (accum + head)
+        | Nil            -> accum
+    in
+    with_accumulator list 0
+
 let main : @in -> @out =
-    let input : int = @in in
     let l : list = Cons 1 (Cons 2 (Cons 3 Nil)) in
+    let input : int = @in in
+    @out (sum l);
     @out (is_second_element input l)

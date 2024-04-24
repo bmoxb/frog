@@ -9,4 +9,4 @@ let fib n : int -> int =
 let main : @in -> @out =
     @out "n = ";
     let input : int = @in in
-    @out "\n" "F_n = " (fib input)
+    @out "F_n = " (fib input)
