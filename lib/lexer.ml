@@ -12,104 +12,100 @@ let is_whitespace = function ' ' | '\n' | '\t' -> true | _ -> false
 
 (* Get the next character in the input stream without incrementing the current
    position in the stream. *)
-let peek lexer =
-  if lexer.pos.finish < String.length lexer.source_code then
-    Some lexer.source_code.[lexer.pos.finish]
+let peek l =
+  if l.pos.finish < String.length l.source_code then
+    Some l.source_code.[l.pos.finish]
   else None
 
 (* Increment the current position in the input stream. *)
-let advance lexer =
-  { lexer with pos = { lexer.pos with finish = lexer.pos.finish + 1 } }
+let advance l = { l with pos = { l.pos with finish = l.pos.finish + 1 } }
 
 (* Continually advance while the given condition remains true. *)
-let rec advance_while should_advance lexer =
-  match peek lexer with
-  | Some c when should_advance c ->
-      lexer |> advance |> advance_while should_advance
-  | _ -> lexer
+let rec advance_while should_advance l =
+  match peek l with
+  | Some c when should_advance c -> l |> advance |> advance_while should_advance
+  | _ -> l
 
 (* Advance if the condition is true and return the if_match token type.
    Otherwise, do not advance and return the otherwise token type. *)
-let conditionally_advance cond ~if_match ~otherwise lexer =
-  match peek lexer with
-  | Some c when cond c -> (advance lexer, if_match)
-  | _ -> (lexer, otherwise)
+let conditionally_advance cond ~if_match ~otherwise l =
+  match peek l with
+  | Some c when cond c -> (advance l, if_match)
+  | _ -> (l, otherwise)
 
-let rec handle_string lexer =
-  match peek lexer with
-  | Some '"' -> (advance lexer, Token.StringLiteral)
-  | Some _ -> lexer |> advance |> handle_string
+let rec handle_string l =
+  match peek l with
+  | Some '"' -> (advance l, Token.StringLiteral)
+  | Some _ -> l |> advance |> handle_string
   | None -> Err.raise_unexpected_eof ()
 
-let rec handle_number ?(is_decimal = false) lexer =
-  match peek lexer with
-  | Some c when is_digit c -> lexer |> advance |> handle_number ~is_decimal
+let rec handle_number ?(is_decimal = false) l =
+  match peek l with
+  | Some c when is_digit c -> l |> advance |> handle_number ~is_decimal
   | Some '.' when not is_decimal ->
-      lexer |> advance |> handle_number ~is_decimal:true
-  | _ -> (lexer, Token.NumberLiteral)
+      l |> advance |> handle_number ~is_decimal:true
+  | _ -> (l, Token.NumberLiteral)
 
-let rec handle_identifier lexer =
-  match peek lexer with
-  | Some c when is_identifier c -> lexer |> advance |> handle_identifier
+let rec handle_identifier l =
+  match peek l with
+  | Some c when is_identifier c -> l |> advance |> handle_identifier
   | _ ->
-      let lexeme = Position.substring lexer.source_code lexer.pos in
-      (lexer, Token.lookup_identifier_or_keyword lexeme)
+      let lexeme = Position.substring l.source_code l.pos in
+      (l, Token.lookup_identifier_or_keyword lexeme)
 
-let token_kind c lexer =
+let token_kind c l =
   let open Token in
-  let lexer = advance lexer in
+  let l = advance l in
   match c with
-  | '(' -> (lexer, OpenBracket)
-  | ')' -> (lexer, CloseBracket)
-  | '+' -> (lexer, Plus)
+  | '(' -> (l, OpenBracket)
+  | ')' -> (l, CloseBracket)
+  | '+' -> (l, Plus)
   | '-' ->
-      lexer
-      |> conditionally_advance (( = ) '>') ~if_match:Arrow ~otherwise:Minus
-  | '*' -> (lexer, Star)
-  | '/' -> (lexer, Slash)
+      l |> conditionally_advance (( = ) '>') ~if_match:Arrow ~otherwise:Minus
+  | '*' -> (l, Star)
+  | '/' -> (l, Slash)
   | '=' ->
-      lexer
-      |> conditionally_advance (( = ) '=') ~if_match:Equiv ~otherwise:Equals
-  | ':' -> (lexer, Colon)
-  | ';' -> (lexer, Semicolon)
-  | ',' -> (lexer, Comma)
+      l |> conditionally_advance (( = ) '=') ~if_match:Equiv ~otherwise:Equals
+  | ':' -> (l, Colon)
+  | ';' -> (l, Semicolon)
+  | ',' -> (l, Comma)
   | '!' ->
-      lexer
+      l
       |> conditionally_advance (( = ) '=') ~if_match:NotEquiv
            ~otherwise:Exclamation
   | '>' ->
-      lexer
+      l
       |> conditionally_advance (( = ) '=') ~if_match:GreaterThanOrEqual
            ~otherwise:GreaterThan
   | '<' ->
-      lexer
+      l
       |> conditionally_advance (( = ) '=') ~if_match:LessThanOrEqual
            ~otherwise:LessThan
-  | '|' -> (lexer, Pipe)
-  | '"' -> handle_string lexer
-  | '@' -> handle_identifier lexer
-  | c when is_digit c || c = '.' -> handle_number lexer
-  | c when is_identifier c -> handle_identifier lexer
-  | _ -> Err.raise_lexical_error c lexer.pos
+  | '|' -> (l, Pipe)
+  | '"' -> handle_string l
+  | '@' -> handle_identifier l
+  | c when is_digit c || c = '.' -> handle_number l
+  | c when is_identifier c -> handle_identifier l
+  | _ -> Err.raise_lexical_error c l.pos
 
 (* Discard whitespace characters and comments (which start with a '#' and end
    with a newline. *)
-let rec discard_characters lexer =
-  match peek lexer with
-  | Some '#' -> lexer |> advance_while (( <> ) '\n') |> discard_characters
+let rec discard_characters l =
+  match peek l with
+  | Some '#' -> l |> advance_while (( <> ) '\n') |> discard_characters
   | Some c when is_whitespace c ->
-      lexer |> advance_while is_whitespace |> discard_characters
-  | _ -> lexer
+      l |> advance_while is_whitespace |> discard_characters
+  | _ -> l
 
 (* Set the lexer's internal start position to the end position value. *)
-let reset_start_position lexer =
-  let offset = lexer.pos.finish in
-  { lexer with pos = { start = offset; finish = offset } }
+let reset_start_position l =
+  let offset = l.pos.finish in
+  { l with pos = { start = offset; finish = offset } }
 
-let token lexer =
-  let lexer = lexer |> discard_characters |> reset_start_position in
-  peek lexer
+let token l =
+  let l = l |> discard_characters |> reset_start_position in
+  peek l
   |> Option.map (fun c ->
-         let lexer, kind = token_kind c lexer in
-         let token : Token.t = { kind; pos = lexer.pos } in
-         (lexer, token))
+         let l, kind = token_kind c l in
+         let token : Token.t = { kind; pos = l.pos } in
+         (l, token))
