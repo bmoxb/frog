@@ -3,7 +3,7 @@
 type t
 
 val init : string -> Token.t list -> t
-(** Initialise a parser with the given source code and a list of tokens
+(** Initialise a parser with the given Frog source code and a list of tokens
     (produced previously by the lexer) as input. *)
 
 val top_level : t -> (t * Ast.t) option
