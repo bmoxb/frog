@@ -69,24 +69,27 @@ and push_expr_to_specific_location (expr : Expr.t) location ~next_term =
           Star,
           Pop (Lambda, "x", Push (Variable "x", location, next_term)) )
 
+and expr_with_parameters_popped expr = function
+  | head :: tail ->
+      Pop (Lambda, head, Grouping (expr_with_parameters_popped expr tail))
+  | [] -> push_expr expr ~next_term:(Jump Star)
+
 and translate_let_in info bound_expr in_expr =
   translate_let info bound_expr
     ~next_term:(push_expr in_expr ~next_term:(Jump Star))
 
-and translate_match _expr _arms = failwith "TODO"
-(*
+and translate_match expr arms =
   let rec translate_arms lhs_term = function
-    | { constructor; parameters; expr; _ } :: tail ->
-        (* TODO: Pop parameters. *)
-        let next_lhs_term =
-          Choice
-            (lhs_term, Jmp constructor, push_expr expr ~next_term:(Jump Star))
+    | (arm : Ast.Expr.match_arm) :: tail ->
+        let arm_term =
+          Grouping
+            (expr_with_parameters_popped arm.expr (List.rev arm.parameters))
         in
+        let next_lhs_term = Choice (lhs_term, Jmp arm.constructor, arm_term) in
         translate_arms next_lhs_term tail
     | [] -> lhs_term
   in
   translate_arms (eval_expr expr) arms
-  *)
 
 and translate_if_then_else condition_expr then_expr else_expr =
   let condition_term = eval_expr condition_expr in
@@ -143,24 +146,16 @@ and translate_function_application fn = function
   | [] -> eval_expr fn
 
 and translate_let info expr ~next_term =
-  let pop_and_continue identifier ~next_term =
-    Pop (Lambda, identifier, Grouping next_term)
-  in
-  let rec expr_with_args_popped args =
-    match args with
-    | head :: tail ->
-        pop_and_continue head ~next_term:(expr_with_args_popped tail)
-    | [] -> push_expr expr ~next_term:(Jump Star)
-  in
   match info.parameters with
   (* Bind an expression that is evaluated immediately. *)
-  | [] -> push_expr expr ~next_term:(pop_and_continue info.name ~next_term)
+  | [] ->
+      push_expr expr ~next_term:(Pop (Lambda, info.name, Grouping next_term))
   (* Bind a function that is evaluated only when called. *)
   | parameters ->
       Push
-        ( expr_with_args_popped parameters,
+        ( expr_with_parameters_popped expr parameters,
           Lambda,
-          pop_and_continue info.name ~next_term )
+          Pop (Lambda, info.name, Grouping next_term) )
 
 let translate nodes =
   let rec translate_tracking_main ?main_expr = function

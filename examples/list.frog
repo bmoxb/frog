@@ -1,10 +1,12 @@
 data list = Cons int list | Nil
 
+# Return true if the second element of the list is n, otherwise false.
 let is_second_element n head : int list -> bool =
     match head with
-    | Cons n (Cons m tail) -> m == head
-    | Cons n (Nil)           -> False
-    | Nil                    -> False
+    | Cons _ next -> (match next with
+                      | Cons m _ -> n == m
+                      | Nil -> False)
+    | Nil         -> False
 
 let main : @in -> @out =
     let input : int = @in in

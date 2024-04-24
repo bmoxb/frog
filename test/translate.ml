@@ -103,9 +103,10 @@ let tests =
        @ test_translate_exprs "match"
            [
              ( "match x with Some n -> n + 1 | None -> 0",
-               "x; Some -> (<n>.[1].[n].+); None -> ([0])" );
+               "x; Some -> (<n>.([1].[n].+)); None -> ([0])" );
              ( "match range 5 with Cons num tail -> num | Nil -> 0",
-               "[5].range; Cons -> (<tail>.(<head>.[head])); Nil -> ([0])" );
+               "[5].range; <x>.x; Cons -> (<tail>.(<num>.([num]))); Nil -> \
+                ([0])" );
            ]
        @ test_translate_top_levels "main"
            [
