@@ -84,7 +84,7 @@ let parse_arms parse_arm p =
 let rec data_type p =
   (* Either map a simple type into a function type (if possible) or return as
      is. *)
-  let try_into_function_type (p, (in_head : Ast.DataType.t)) =
+  let try_into_function_type (p, in_head) =
     let p, _, in_tail = any_number_of simple_type p in
     (* If there are no following simple types or a '->' token, then this must
        just be a single simple type rather than a function type. *)

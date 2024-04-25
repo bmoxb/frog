@@ -117,14 +117,14 @@ and translate_application fn args =
       translate_constructor_application (Jmp lexeme) (List.rev args)
   | _ -> translate_function_application fn (List.rev args)
 
-and translate_location_application location (args : Expr.t list) =
+and translate_location_application location args =
   match args with
   | expr :: tail ->
       push_expr_to_specific_location expr location
         ~next_term:(translate_location_application location tail)
   | [] -> Jump Star
 
-and translate_constructor_application jmp (args : Expr.t list) =
+and translate_constructor_application jmp args =
   let rec jump_with_args_pushed = function
     | var :: tail -> Push (Variable var, Lambda, jump_with_args_pushed tail)
     | [] -> Jump jmp
