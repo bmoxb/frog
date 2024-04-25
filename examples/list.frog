@@ -13,7 +13,7 @@ let is_second_element n head : int list -> bool =
 let sum list : list -> int =
     # Recursive calls must be in the tail position so use an accumulator.
     let with_accumulator l accum : list int -> int =
-        match list with
+        match l with
         | Cons head tail -> with_accumulator tail (accum + head)
         | Nil            -> accum
     in
