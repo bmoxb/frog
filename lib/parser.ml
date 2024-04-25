@@ -85,30 +85,22 @@ let parse_arms parse_arm p =
 let rec data_type p =
   (* Either map a simple type into a function type (if possible) or return as
      is. *)
-  let try_into_function_type (p, (inputs_head : Ast.DataType.t)) =
-    let p, _, inputs_tail = any_number_of simple_type p in
+  let try_into_function_type (p, (in_head : Ast.DataType.t)) =
+    let p, _, in_tail = any_number_of simple_type p in
     (* If there are no following simple types or a '->' token, then this must
        just be a single simple type rather than a function type. *)
-    if List.is_empty inputs_tail && peek_kind p <> Some Arrow then
-      (p, inputs_head)
+    if List.is_empty in_tail && peek_kind p <> Some Arrow then (p, in_head)
     else
       let p, _ = expect_kind Arrow "Expected '->' in function type." p in
-      let p, (outputs_head : Ast.DataType.t) = expect_simple_type p in
-      let p, last_opt, outputs_tail = any_number_of simple_type p in
+      let p, (out_head : Ast.DataType.t) = expect_simple_type p in
+      let p, last_opt, out_tail = any_number_of simple_type p in
+      (* Set up a function data type AST node. *)
+      let finish = (last_opt |> Option.value ~default:out_head).pos.finish in
+      let inputs, outputs = (in_head :: in_tail, out_head :: out_tail) in
       let node : Ast.DataType.t =
         {
-          pos =
-            {
-              start = inputs_head.pos.start;
-              finish =
-                (last_opt |> Option.value ~default:outputs_head).pos.finish;
-            };
-          kind =
-            Ast.DataType.Function
-              {
-                inputs = inputs_head :: inputs_tail;
-                outputs = outputs_head :: outputs_tail;
-              };
+          pos = { start = in_head.pos.start; finish };
+          kind = Ast.DataType.Function { inputs; outputs };
         }
       in
       (p, node)
@@ -345,7 +337,8 @@ and left_associative_binary_expr child_expr is_wanted_op p =
   | _ -> (p, left_expr)
 
 (* Helper function for parsing a top-level let definition or the first part of
-   a let-in expression. *)
+   a let-in expression. Returns the start position of the let keyword token
+   (for position tracking), the binding info, and the bound expression. *)
 and parse_let p =
   let p, let_token = advance p in
   let p, _, name =
