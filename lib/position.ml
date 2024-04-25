@@ -2,9 +2,11 @@
     'human-readable' format (i.e., line position + character index). *)
 
 type t = { start : int; finish : int } [@@deriving show]
-(** Represents a position in a source file as start and end byte offsets. This
-    type may be stored with each token and AST node for the purpose of
-    giving useful error messages later. *)
+(** A position in a source file expressed as start and end byte offsets. This
+    type may be stored with each token and AST node for the purpose of giving
+    useful error messages later. *)
+
+let merge left right = { start = left.start; finish = right.finish }
 
 let substring s position =
   String.sub s position.start (position.finish - position.start)

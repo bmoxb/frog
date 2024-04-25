@@ -95,11 +95,11 @@ let rec data_type p =
       let p, (out_head : Ast.DataType.t) = expect_simple_type p in
       let p, last_opt, out_tail = any_number_of simple_type p in
       (* Set up a function data type AST node. *)
-      let finish = (last_opt |> Option.value ~default:out_head).pos.finish in
+      let last_pos = (last_opt |> Option.value ~default:out_head).pos in
       let inputs, outputs = (in_head :: in_tail, out_head :: out_tail) in
       let node : Ast.DataType.t =
         {
-          pos = { start = in_head.pos.start; finish };
+          pos = Position.merge in_head.pos last_pos;
           kind = Ast.DataType.Function { inputs; outputs };
         }
       in
@@ -133,7 +133,7 @@ let rec expr p : t * Ast.Expr.t =
       let p, rhs = expr p in
       let node : Ast.Expr.t =
         {
-          pos = { start = lhs.pos.start; finish = rhs.pos.finish };
+          pos = Position.merge lhs.pos rhs.pos;
           kind = Ast.Expr.Chain (lhs, rhs);
         }
       in
@@ -172,7 +172,7 @@ and match_with p =
   let p, last_arm, arms = parse_arms match_arm p in
   let node : Ast.Expr.t =
     {
-      pos = { start = match_token.pos.start; finish = last_arm.arm_pos.finish };
+      pos = Position.merge match_token.pos last_arm.arm_pos;
       kind = Ast.Expr.Match (condition_expr, arms);
     }
   in
@@ -190,9 +190,7 @@ and match_arm p : t * Ast.Expr.match_arm =
       p
   in
   let p, expr = expr p in
-  let arm_pos : Position.t =
-    { start = constructor_token.pos.start; finish = expr.pos.finish }
-  in
+  let arm_pos = Position.merge constructor_token.pos expr.pos in
   let arm : Ast.Expr.match_arm = { arm_pos; constructor; parameters; expr } in
   (p, arm)
 
@@ -212,7 +210,7 @@ and if_then_else p =
   let p, else_expr = expr p in
   let node : Ast.Expr.t =
     {
-      pos = { start = if_token.pos.start; finish = else_expr.pos.finish };
+      pos = Position.merge if_token.pos else_expr.pos;
       kind = Ast.Expr.IfThenElse { condition_expr; then_expr; else_expr };
     }
   in
@@ -260,7 +258,7 @@ and unary p =
       let p, expr = unary p in
       let node : Ast.Expr.t =
         {
-          pos = { start = op_token.pos.start; finish = expr.pos.finish };
+          pos = Position.merge op_token.pos expr.pos;
           kind = Ast.Expr.UnaryOp (op, expr);
         }
       in
@@ -271,12 +269,12 @@ and unary p =
 and application p =
   let p, (head_expr : Ast.Expr.t) = expect_primary p in
   let p, last_opt, tail_exprs = any_number_of primary p in
-  let finish = (last_opt |> Option.value ~default:head_expr).pos.finish in
+  let last_pos = (last_opt |> Option.value ~default:head_expr).pos in
   if List.is_empty tail_exprs then (p, head_expr)
   else
     let node : Ast.Expr.t =
       {
-        pos = { start = head_expr.pos.start; finish };
+        pos = Position.merge head_expr.pos last_pos;
         kind = Ast.Expr.Application (head_expr, tail_exprs);
       }
     in
@@ -309,8 +307,7 @@ and grouping p =
         in
         let node : Ast.Expr.t =
           {
-            pos =
-              { start = open_token.pos.start; finish = close_token.pos.finish };
+            pos = Position.merge open_token.pos close_token.pos;
             kind = Ast.Expr.Grouping expr;
           }
         in
@@ -329,7 +326,7 @@ and left_associative_binary_expr child_expr is_wanted_op p =
       in
       let node : Ast.Expr.t =
         {
-          pos = { start = left_expr.pos.start; finish = right_expr.pos.finish };
+          pos = Position.merge left_expr.pos right_expr.pos;
           kind = Ast.Expr.BinOp (op, left_expr, right_expr);
         }
       in
@@ -373,9 +370,9 @@ let data_arm p =
       "Expected a constructor identifier." p
   in
   let p, last_opt, data_types = any_number_of simple_type p in
-  let finish = (last_opt |> Option.value ~default:token).pos.finish in
+  let last_pos = (last_opt |> Option.value ~default:token).pos in
   let arm : Ast.data_arm =
-    { arm_pos = { start = token.pos.start; finish }; constructor; data_types }
+    { arm_pos = Position.merge token.pos last_pos; constructor; data_types }
   in
   (p, arm)
 
@@ -390,7 +387,7 @@ let data_definition p =
   let p, last_arm, arms = parse_arms data_arm p in
   let node : Ast.t =
     {
-      pos = { start = data_token.pos.start; finish = last_arm.arm_pos.finish };
+      pos = Position.merge data_token.pos last_arm.arm_pos;
       kind = Ast.Data (identifier, arms);
     }
   in
