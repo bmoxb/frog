@@ -44,11 +44,10 @@ let expect_or_syntax_error rule error_msg p =
 (* Parse using a rule any number (0 or more) times. Returns the last node (if
     any) along with the list of all nodes. *)
 let any_number_of rule p =
-  (* TODO: last isn't set. *)
   let rec traverse ~last p =
     match rule p with
     | Some (p, head) ->
-        let p, last, tail = traverse ~last p in
+        let p, last, tail = traverse ~last:(Some head) p in
         (p, last, head :: tail)
     | None -> (p, last, [])
   in
@@ -77,8 +76,8 @@ let parse_arms parse_arm p =
     match peek_kind p with Some Pipe -> advance_and_discard p | _ -> p
   in
   let p, head_arm = parse_arm p in
-  let p, last_opt, tail_arms = any_number_of parse_arm_with_pipe p in
-  let last_arm = Option.value ~default:head_arm last_opt in
+  let p, last_arm_opt, tail_arms = any_number_of parse_arm_with_pipe p in
+  let last_arm = Option.value ~default:head_arm last_arm_opt in
   (p, last_arm, head_arm :: tail_arms)
 
 (* type = simple_type [ { simple_type } "->" simple_type { simple_type } ] *)
@@ -93,9 +92,11 @@ let rec data_type p =
     else
       let p, _ = expect_kind Arrow "Expected '->' in function type." p in
       let p, (out_head : Ast.DataType.t) = expect_simple_type p in
-      let p, last_opt, out_tail = any_number_of simple_type p in
+      let p, last_simple_type_opt, out_tail = any_number_of simple_type p in
       (* Set up a function data type AST node. *)
-      let last_pos = (last_opt |> Option.value ~default:out_head).pos in
+      let last_pos =
+        (last_simple_type_opt |> Option.value ~default:out_head).pos
+      in
       let inputs, outputs = (in_head :: in_tail, out_head :: out_tail) in
       let node : Ast.DataType.t =
         {
@@ -268,15 +269,16 @@ and unary p =
 (* application = primary { primary } *)
 and application p =
   let p, (head_expr : Ast.Expr.t) = expect_primary p in
-  let p, last_opt, tail_exprs = any_number_of primary p in
-  let last_pos = (last_opt |> Option.value ~default:head_expr).pos in
+  let p, last_primary_opt, tail_exprs = any_number_of primary p in
+  let pos =
+    match last_primary_opt with
+    | Some (last : Ast.Expr.t) -> Position.merge head_expr.pos last.pos
+    | None -> head_expr.pos
+  in
   if List.is_empty tail_exprs then (p, head_expr)
   else
     let node : Ast.Expr.t =
-      {
-        pos = Position.merge head_expr.pos last_pos;
-        kind = Ast.Expr.Application (head_expr, tail_exprs);
-      }
+      { pos; kind = Ast.Expr.Application (head_expr, tail_exprs) }
     in
     (p, node)
 
@@ -369,11 +371,13 @@ let data_arm p =
     expect_kind_with_lexeme CapitalisedIdentifier
       "Expected a constructor identifier." p
   in
-  let p, last_opt, data_types = any_number_of simple_type p in
-  let last_pos = (last_opt |> Option.value ~default:token).pos in
-  let arm : Ast.data_arm =
-    { arm_pos = Position.merge token.pos last_pos; constructor; data_types }
+  let p, last_data_type_opt, data_types = any_number_of simple_type p in
+  let arm_pos =
+    match last_data_type_opt with
+    | Some last -> Position.merge token.pos last.pos
+    | None -> token.pos
   in
+  let arm : Ast.data_arm = { arm_pos; constructor; data_types } in
   (p, arm)
 
 (* data = "data" IDENTIFIER "=" [ "|" ] data_arm { "|" data_arm } *)
