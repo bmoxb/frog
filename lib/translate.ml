@@ -41,15 +41,15 @@ let rec translate_expr (expr : Expr.t) =
   | UnaryOp (op, expr) -> translate_unary_op op expr
   | Application (fn, args) -> translate_application fn args
   | Grouping expr -> translate_expr expr
-  | Chain (lhs, rhs) -> Choice (translate_expr lhs, Star, translate_expr rhs)
-  | Primary (kind, lexeme) -> push_primary kind lexeme ~next_term:(Jump Star)
+  | Chain (lhs, rhs) -> Compose (translate_expr lhs, translate_expr rhs)
+  | Primary (kind, lexeme) -> push_primary kind lexeme ~next_term:(Jump Skip)
 
 (* Convert an expression to an FMC term that directly evaluates to the computed
    value. *)
 and eval_expr (expr : Expr.t) =
   match expr.kind with
   | Primary (kind, lexeme) -> eval_primary kind lexeme
-  | _ -> Choice (translate_expr expr, Star, Pop (Lambda, "x", Variable "x"))
+  | _ -> Compose (translate_expr expr, Pop (Lambda, "x", Variable "x"))
 
 (* Convert an expression to an FMC term that pushes the computed value. *)
 and push_expr (expr : Expr.t) ~next_term =
@@ -57,26 +57,25 @@ and push_expr (expr : Expr.t) ~next_term =
   | Primary (kind, lexeme) -> push_primary kind lexeme ~next_term
   | _ -> (
       match next_term with
-      | Jump Star -> translate_expr expr
-      | _ -> Choice (translate_expr expr, Star, next_term))
+      | Jump Skip -> translate_expr expr
+      | _ -> Compose (translate_expr expr, next_term))
 
 and push_expr_to_specific_location (expr : Expr.t) location ~next_term =
   match expr.kind with
   | Primary (kind, lexeme) -> push_primary kind lexeme ~location ~next_term
   | _ ->
-      Choice
+      Compose
         ( translate_expr expr,
-          Star,
           Pop (Lambda, "x", Push (Variable "x", location, next_term)) )
 
 and expr_with_parameters_popped expr = function
   | head :: tail ->
       Pop (Lambda, head, Grouping (expr_with_parameters_popped expr tail))
-  | [] -> push_expr expr ~next_term:(Jump Star)
+  | [] -> push_expr expr ~next_term:(Jump Skip)
 
 and translate_let_in info bound_expr in_expr =
   translate_let info bound_expr
-    ~next_term:(push_expr in_expr ~next_term:(Jump Star))
+    ~next_term:(push_expr in_expr ~next_term:(Jump Skip))
 
 and translate_match expr arms =
   let rec translate_arms lhs_term = function
@@ -85,7 +84,7 @@ and translate_match expr arms =
           Grouping
             (expr_with_parameters_popped arm.expr (List.rev arm.parameters))
         in
-        let next_lhs_term = Choice (lhs_term, Jmp arm.constructor, arm_term) in
+        let next_lhs_term = Join (lhs_term, Jmp arm.constructor, arm_term) in
         translate_arms next_lhs_term tail
     | [] -> lhs_term
   in
@@ -93,11 +92,11 @@ and translate_match expr arms =
 
 and translate_if_then_else condition_expr then_expr else_expr =
   let condition_term = eval_expr condition_expr in
-  Choice
-    ( Choice
-        (condition_term, Jmp "True", push_expr then_expr ~next_term:(Jump Star)),
+  Join
+    ( Join
+        (condition_term, Jmp "True", push_expr then_expr ~next_term:(Jump Skip)),
       Jmp "False",
-      push_expr else_expr ~next_term:(Jump Star) )
+      push_expr else_expr ~next_term:(Jump Skip) )
 
 and translate_bin_op op lhs rhs =
   let op_var = Variable (Expr.display_binary_operator op) in
@@ -105,7 +104,7 @@ and translate_bin_op op lhs rhs =
 
 and translate_unary_op op expr =
   match op with
-  | Not -> failwith "unimplemented"
+  | Not -> failwith "TODO"
   | Negate ->
       push_expr expr ~next_term:(Push (Variable "0", Lambda, Variable "-"))
 
@@ -122,7 +121,7 @@ and translate_location_application location args =
   | expr :: tail ->
       push_expr_to_specific_location expr location
         ~next_term:(translate_location_application location tail)
-  | [] -> Jump Star
+  | [] -> Jump Skip
 
 and translate_constructor_application jmp args =
   let rec jump_with_args_pushed = function
@@ -136,7 +135,7 @@ and translate_constructor_application jmp args =
           prepare_args_and_push_jump next_var (var :: vars_to_push) tail
         in
         push_expr expr ~next_term:(Pop (Lambda, var, Grouping next_arg_term))
-    | [] -> Push (jump_with_args_pushed vars_to_push, Lambda, Jump Star)
+    | [] -> Push (jump_with_args_pushed vars_to_push, Lambda, Jump Skip)
   in
   prepare_args_and_push_jump "a" [] args
 
@@ -169,7 +168,7 @@ let translate nodes =
     (* Once all nodes are traversed, insert the translated main function at the
        end. *)
     | [] ->
-        main_expr |> Option.map eval_expr |> Option.value ~default:(Jump Star)
+        main_expr |> Option.map eval_expr |> Option.value ~default:(Jump Skip)
     (* Skip data definitions as they do not require translation. *)
     | { kind = Data _; _ } :: tail -> translate_tracking_main ?main_expr tail
   in
