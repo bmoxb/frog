@@ -5,15 +5,6 @@ type identifier = string [@@deriving show]
 module DataType = struct
   type simple_kind = Identifier | Location [@@deriving show]
 
-  let display_simple_kind = function
-    | Identifier -> "identifier"
-    | Location -> "location"
-
-  let token_kind_to_simple_kind = function
-    | Token.Identifier -> Some Identifier
-    | Token.LocationIdentifier -> Some Location
-    | _ -> None
-
   type t = { pos : Position.t; kind : kind }
 
   and kind =
@@ -47,43 +38,7 @@ module Expr = struct
     | Divide
   [@@deriving show]
 
-  let display_binary_operator = function
-    | And -> "and"
-    | Or -> "or"
-    | Equiv -> "=="
-    | NotEquiv -> "!="
-    | GreaterThan -> ">"
-    | LessThan -> "<"
-    | GreaterThanOrEqual -> ">="
-    | LessThanOrEqual -> "<="
-    | Add -> "+"
-    | Subtract -> "-"
-    | Multiply -> "*"
-    | Divide -> "/"
-
-  let token_kind_to_binary_operator = function
-    | Token.AndKeyword -> Some And
-    | Token.OrKeyword -> Some Or
-    | Token.Equiv -> Some Equiv
-    | Token.NotEquiv -> Some NotEquiv
-    | Token.GreaterThan -> Some GreaterThan
-    | Token.LessThan -> Some LessThan
-    | Token.GreaterThanOrEqual -> Some GreaterThanOrEqual
-    | Token.LessThanOrEqual -> Some LessThanOrEqual
-    | Token.Plus -> Some Add
-    | Token.Minus -> Some Subtract
-    | Token.Star -> Some Multiply
-    | Token.Slash -> Some Divide
-    | _ -> None
-
   type unary_operator = Not | Negate [@@deriving show]
-
-  let display_unary_operator = function Not -> "not" | Negate -> "-"
-
-  let token_kind_to_unary_operator = function
-    | Token.NotKeyword -> Some Not
-    | Token.Minus -> Some Negate
-    | _ -> None
 
   type primary_kind =
     | NumberLiteral
@@ -92,21 +47,6 @@ module Expr = struct
     | Location
     | Constructor
   [@@deriving show]
-
-  let display_primary_kind = function
-    | NumberLiteral -> "number literal"
-    | StringLiteral -> "string literal"
-    | Identifier -> "identifier"
-    | Location -> "location"
-    | Constructor -> "constructor"
-
-  let token_kind_to_primary_kind = function
-    | Token.NumberLiteral -> Some NumberLiteral
-    | Token.StringLiteral -> Some StringLiteral
-    | Token.Identifier -> Some Identifier
-    | Token.LocationIdentifier -> Some Location
-    | Token.CapitalisedIdentifier -> Some Constructor
-    | _ -> None
 
   type t = { pos : Position.t; kind : kind } [@@deriving show]
 

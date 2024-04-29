@@ -30,6 +30,20 @@ let push_primary ?(location = Lambda) kind lexeme ~next_term =
           Push (Variable "x", location, next_term) )
   | _ -> Push (Variable lexeme, location, next_term)
 
+let binary_operator_to_fmc_name : Ast.Expr.binary_operator -> string = function
+  | And -> "&&"
+  | Or -> "||"
+  | Equiv -> "=="
+  | NotEquiv -> "!="
+  | GreaterThan -> ">"
+  | LessThan -> "<"
+  | GreaterThanOrEqual -> ">="
+  | LessThanOrEqual -> "<="
+  | Add -> "+"
+  | Subtract -> "-"
+  | Multiply -> "*"
+  | Divide -> "/"
+
 let rec translate_expr (expr : Expr.t) =
   match expr.kind with
   | LetIn { info; bound_expr; in_expr } ->
@@ -99,12 +113,12 @@ and translate_if_then_else condition_expr then_expr else_expr =
       push_expr else_expr ~next_term:(Jump Skip) )
 
 and translate_bin_op op lhs rhs =
-  let op_var = Variable (Expr.display_binary_operator op) in
+  let op_var = Variable (binary_operator_to_fmc_name op) in
   push_expr rhs ~next_term:(push_expr lhs ~next_term:op_var)
 
 and translate_unary_op op expr =
   match op with
-  | Not -> failwith "TODO"
+  | Not -> push_expr expr ~next_term:(Variable "!")
   | Negate ->
       push_expr expr ~next_term:(Push (Variable "0", Lambda, Variable "-"))
 

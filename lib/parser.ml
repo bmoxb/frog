@@ -80,6 +80,13 @@ let parse_arms parse_arm p =
   let last_arm = Option.value ~default:head_arm last_arm_opt in
   (p, last_arm, head_arm :: tail_arms)
 
+let token_kind_to_simple_type_kind =
+  let open Ast.DataType in
+  function
+  | Token.Identifier -> Some Identifier
+  | Token.LocationIdentifier -> Some Location
+  | _ -> None
+
 (* type = simple_type [ { simple_type } "->" simple_type { simple_type } ] *)
 let rec data_type p =
   (* Either map a simple type into a function type (if possible) or return as
@@ -112,7 +119,7 @@ and expect_data_type p = expect_or_syntax_error data_type "Expected a type." p
 
 (* simple_type = IDENTIFIER | LOCATION_IDENTIFIER *)
 and simple_type p =
-  Option.bind (peek_kind p) Ast.DataType.token_kind_to_simple_kind
+  Option.bind (peek_kind p) token_kind_to_simple_type_kind
   |> Option.map (fun kind ->
          let p, token = advance p in
          let identifier = Token.lexeme p.source_code token in
@@ -123,6 +130,38 @@ and simple_type p =
 
 and expect_simple_type p =
   expect_or_syntax_error simple_type "Expected a simple type." p
+
+let token_kind_to_binary_operator =
+  let open Ast.Expr in
+  function
+  | Token.AndKeyword -> Some And
+  | Token.OrKeyword -> Some Or
+  | Token.Equiv -> Some Equiv
+  | Token.NotEquiv -> Some NotEquiv
+  | Token.GreaterThan -> Some GreaterThan
+  | Token.LessThan -> Some LessThan
+  | Token.GreaterThanOrEqual -> Some GreaterThanOrEqual
+  | Token.LessThanOrEqual -> Some LessThanOrEqual
+  | Token.Plus -> Some Add
+  | Token.Minus -> Some Subtract
+  | Token.Star -> Some Multiply
+  | Token.Slash -> Some Divide
+  | _ -> None
+
+let token_kind_to_unary_operator =
+  let open Ast.Expr in
+  function
+  | Token.NotKeyword -> Some Not | Token.Minus -> Some Negate | _ -> None
+
+let token_kind_to_primary_kind =
+  let open Ast.Expr in
+  function
+  | Token.NumberLiteral -> Some NumberLiteral
+  | Token.StringLiteral -> Some StringLiteral
+  | Token.Identifier -> Some Identifier
+  | Token.LocationIdentifier -> Some Location
+  | Token.CapitalisedIdentifier -> Some Constructor
+  | _ -> None
 
 (* expr = core_expr [ ";" expr ] *)
 let rec expr p : t * Ast.Expr.t =
@@ -253,7 +292,7 @@ and factor p =
 
 (* unary = ( "not" | "-" ) unary | application *)
 and unary p =
-  match Option.bind (peek_kind p) Ast.Expr.token_kind_to_unary_operator with
+  match Option.bind (peek_kind p) token_kind_to_unary_operator with
   | Some op ->
       let p, op_token = advance p in
       let p, expr = unary p in
@@ -285,7 +324,7 @@ and application p =
 (* primary = NUMBER_LITERAL | STRING_LITERAL | IDENTIFIER | LOCATION_IDENTIFIER
            | CAPITALISED_IDENTIFIER | grouping *)
 and primary p =
-  match Option.bind (peek_kind p) Ast.Expr.token_kind_to_primary_kind with
+  match Option.bind (peek_kind p) token_kind_to_primary_kind with
   | Some primary_kind ->
       let p, token = advance p in
       let literal = Token.lexeme p.source_code token in
@@ -319,7 +358,7 @@ and grouping p =
 (* Helper function for parsing left associative binary expressions. *)
 and left_associative_binary_expr child_expr is_wanted_op p =
   let p, left_expr = child_expr p in
-  match Option.bind (peek_kind p) Ast.Expr.token_kind_to_binary_operator with
+  match Option.bind (peek_kind p) token_kind_to_binary_operator with
   | Some op when is_wanted_op op ->
       (* Consume the operator token. *)
       let p = advance_and_discard p in

@@ -2,7 +2,7 @@ let rec data_type_to_tree_vertex (data_type : Ast.DataType.t) =
   let label, edges =
     match data_type.kind with
     | Simple (kind, identifier) ->
-        ( Ast.DataType.display_simple_kind kind,
+        ( Ast.DataType.show_simple_kind kind,
           [ Tree.edge (Tree.vertex identifier) ] )
     | Function { inputs; outputs } ->
         let data_type_to_edge data_type =
@@ -55,13 +55,13 @@ let rec expr_to_tree_vertex (expr : Ast.Expr.t) =
         ( "binary operation",
           [
             Tree.edge ~label:"lhs" (expr_to_tree_vertex lhs);
-            Tree.edge ~label:"op" (Tree.vertex (display_binary_operator op));
+            Tree.edge ~label:"op" (Tree.vertex (show_binary_operator op));
             Tree.edge ~label:"rhs" (expr_to_tree_vertex rhs);
           ] )
     | UnaryOp (op, expr) ->
         ( "unary operation",
           [
-            Tree.edge ~label:"op" (Tree.vertex (display_unary_operator op));
+            Tree.edge ~label:"op" (Tree.vertex (show_unary_operator op));
             Tree.edge ~label:"expr" (expr_to_tree_vertex expr);
           ] )
     | Application (fn, args) ->
@@ -93,8 +93,7 @@ let rec expr_to_tree_vertex (expr : Ast.Expr.t) =
           | _ -> value
         in
         ( "primary",
-          [ Tree.edge ~label:(display_primary_kind kind) (Tree.vertex value) ]
-        )
+          [ Tree.edge ~label:(show_primary_kind kind) (Tree.vertex value) ] )
   in
   Tree.vertex ~colour:(Tree.rgb 0.1 0.1 1.0) ~edges label
 
