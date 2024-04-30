@@ -30,7 +30,7 @@ let push_primary ?(location = Lambda) kind lexeme ~next_term =
           Push (Variable "x", location, next_term) )
   | _ -> Push (Variable lexeme, location, next_term)
 
-let binary_operator_to_fmc_name : Ast.Expr.binary_operator -> string = function
+let binary_operator_to_fmc_name : Expr.binary_operator -> string = function
   | And -> "&&"
   | Or -> "||"
   | Equiv -> "=="
@@ -93,7 +93,7 @@ and translate_let_in info bound_expr in_expr =
 
 and translate_match expr arms =
   let rec translate_arms lhs_term = function
-    | (arm : Ast.Expr.match_arm) :: tail ->
+    | (arm : Expr.match_arm) :: tail ->
         let arm_term =
           Grouping
             (expr_with_parameters_popped arm.expr (List.rev arm.parameters))
