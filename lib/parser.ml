@@ -87,7 +87,7 @@ let token_kind_to_simple_type_kind =
   | Token.LocationIdentifier -> Some Location
   | _ -> None
 
-(* type = simple_type [ { simple_type } "->" simple_type { simple_type } ] *)
+(* type = simple_type, [ { simple_type }, "->", simple_type, { simple_type } ] *)
 let rec data_type p =
   (* Either map a simple type into a function type (if possible) or return as
      is. *)
@@ -163,36 +163,19 @@ let token_kind_to_primary_kind =
   | Token.CapitalisedIdentifier -> Some Constructor
   | _ -> None
 
-(* expr = core_expr [ ";" expr ] *)
+(* expr = let_in | if_then_else | match | chain_expr *)
 let rec expr p : t * Ast.Expr.t =
-  let p, lhs = core_expr p in
-  match peek_kind p with
-  | Some Semicolon ->
-      (* Consume the semicolon. *)
-      let p = advance_and_discard p in
-      let p, rhs = expr p in
-      let node : Ast.Expr.t =
-        {
-          pos = Position.merge lhs.pos rhs.pos;
-          kind = Ast.Expr.Chain (lhs, rhs);
-        }
-      in
-      (p, node)
-  | _ -> (p, lhs)
-
-(* core_expr = let_in | match | if_then_else | logical_or *)
-and core_expr p : t * Ast.Expr.t =
   match peek_kind p with
   | Some LetKeyword -> let_in p
-  | Some MatchKeyword -> match_with p
   | Some IfKeyword -> if_then_else p
-  | _ -> logical_or p
+  | Some MatchKeyword -> match_with p
+  | _ -> chain_expr p
 
-(* let_in = let "in" expr *)
-and let_in p =
+(* let_in = let, "in", expr *)
+and let_in ?(last_rule = expr) p =
   let p, start, info, bound_expr = parse_let p in
   let p, _ = expect_kind InKeyword "Expected 'in' keyword." p in
-  let p, in_expr = expr p in
+  let p, in_expr = last_rule p in
   let node : Ast.Expr.t =
     {
       pos = { start; finish = in_expr.pos.finish };
@@ -201,7 +184,29 @@ and let_in p =
   in
   (p, node)
 
-(* match = "match" expr "with" [ "|" ] match_arm { "|" match_arm } *)
+(* if_then_else = "if", expr, "then", expr, "else", expr *)
+and if_then_else ?(last_rule = expr) p =
+  let p, if_token = advance p in
+  let p, condition_expr = expr p in
+  let p, _ =
+    expect_kind ThenKeyword
+      "Expected 'then' keyword after condition in if-then-else expression." p
+  in
+  let p, then_expr = expr p in
+  let p, _ =
+    expect_kind ElseKeyword
+      "Expected an 'else' clause as part of an if-then-else expression." p
+  in
+  let p, else_expr = last_rule p in
+  let node : Ast.Expr.t =
+    {
+      pos = Position.merge if_token.pos else_expr.pos;
+      kind = Ast.Expr.IfThenElse { condition_expr; then_expr; else_expr };
+    }
+  in
+  (p, node)
+
+(* match = "match", expr, "with", [ "|" ], match_arm, { "|", match_arm } *)
 and match_with p =
   let p, match_token = advance p in
   let p, condition_expr = expr p in
@@ -218,7 +223,7 @@ and match_with p =
   in
   (p, node)
 
-(* match_arm = CAPITALISED_IDENTIFIER { IDENTIFIER } "->" expr *)
+(* match_arm = CAPITALISED_IDENTIFIER, { IDENTIFIER }, "->", arm_expr *)
 and match_arm p : t * Ast.Expr.match_arm =
   let p, constructor_token, constructor =
     expect_kind_with_lexeme CapitalisedIdentifier
@@ -229,47 +234,54 @@ and match_arm p : t * Ast.Expr.match_arm =
     expect_kind Arrow "Expected an arrow '->' token after pattern in match arm."
       p
   in
-  let p, expr = expr p in
+  let p, expr = arm_expr p in
   let arm_pos = Position.merge constructor_token.pos expr.pos in
   let arm : Ast.Expr.match_arm = { arm_pos; constructor; parameters; expr } in
   (p, arm)
 
-(* if_then_else = "if" expr "then" expr "else" expr *)
-and if_then_else p =
-  let p, if_token = advance p in
-  let p, condition_expr = expr p in
-  let p, _ =
-    expect_kind ThenKeyword
-      "Expected 'then' keyword after condition in if-then-else expression." p
-  in
-  let p, then_expr = expr p in
-  let p, _ =
-    expect_kind ElseKeyword
-      "Expected an 'else' clause as part of an if-then-else expression." p
-  in
-  let p, else_expr = expr p in
-  let node : Ast.Expr.t =
-    {
-      pos = Position.merge if_token.pos else_expr.pos;
-      kind = Ast.Expr.IfThenElse { condition_expr; then_expr; else_expr };
-    }
-  in
-  (p, node)
+(* arm_expr = let, "in", arm_expr
+            | "if", expr, "then", expr, "else", arm_expr
+            | chain_expr *)
+and arm_expr p : t * Ast.Expr.t =
+  match peek_kind p with
+  | Some LetKeyword -> let_in ~last_rule:arm_expr p
+  | Some IfKeyword -> if_then_else ~last_rule:arm_expr p
+  | _ -> chain_expr p
 
-(* logical_or = logical_and { "or" logical_and } *)
+(* chain_expr = multi_return, [ ";", chain_expr ] *)
+and chain_expr p =
+  let p, lhs = multi_return p in
+  match peek_kind p with
+  | Some Semicolon ->
+      (* Consume the semicolon. *)
+      let p = advance_and_discard p in
+      let p, rhs = chain_expr p in
+      let node : Ast.Expr.t =
+        {
+          pos = Position.merge lhs.pos rhs.pos;
+          kind = Ast.Expr.Chain (lhs, rhs);
+        }
+      in
+      (p, node)
+  | _ -> (p, lhs)
+
+and multi_return p : t * Ast.Expr.t =
+  left_associative_binary_expr logical_or (( = ) Ast.Expr.Comma) p
+
+(* logical_or = logical_and, { "or", logical_and } *)
 and logical_or p =
   left_associative_binary_expr logical_and (( = ) Ast.Expr.Or) p
 
-(* logical_and = equality { "and" equality } *)
+(* logical_and = equality, { "and", equality } *)
 and logical_and p = left_associative_binary_expr equality (( = ) Ast.Expr.And) p
 
-(* equality = comparison { ( "==" | "!=" ) comparison } *)
+(* equality = comparison, { ( "==" | "!=" ), comparison } *)
 and equality p =
   let open Ast.Expr in
   let is_wanted_op = function Equiv | NotEquiv -> true | _ -> false in
   left_associative_binary_expr comparison is_wanted_op p
 
-(* comparison = term { ( ">" | "<" | ">=" | "<=" ) term } *)
+(* comparison = term, { ( ">" | "<" | ">=" | "<=" ), term } *)
 and comparison p =
   let open Ast.Expr in
   let is_wanted_op = function
@@ -278,19 +290,19 @@ and comparison p =
   in
   left_associative_binary_expr term is_wanted_op p
 
-(* term = factor { ( "+" | "-" ) factor } *)
+(* term = factor, { ( "+" | "-" ), factor } *)
 and term p =
   let open Ast.Expr in
   let is_wanted_op = function Add | Subtract -> true | _ -> false in
   left_associative_binary_expr factor is_wanted_op p
 
-(* factor = unary { ( "*" | "/" ) unary } *)
+(* factor = unary, { ( "*" | "/" ), unary } *)
 and factor p =
   let open Ast.Expr in
   let is_wanted_op = function Multiply | Divide -> true | _ -> false in
   left_associative_binary_expr unary is_wanted_op p
 
-(* unary = ( "not" | "-" ) unary | application *)
+(* unary = ( "not" | "-" ), unary | application *)
 and unary p =
   match Option.bind (peek_kind p) token_kind_to_unary_operator with
   | Some op ->
@@ -305,7 +317,7 @@ and unary p =
       (p, node)
   | None -> application p
 
-(* application = primary { primary } *)
+(* application = primary, { primary } *)
 and application p =
   let p, (head_expr : Ast.Expr.t) = expect_primary p in
   let p, last_primary_opt, tail_exprs = any_number_of primary p in
@@ -337,7 +349,7 @@ and primary p =
 and expect_primary p =
   expect_or_syntax_error primary "Expected primary expression." p
 
-(*  grouping = "(" expr ")" *)
+(*  grouping = "(", expr, ")" *)
 and grouping p =
   Option.bind (peek_kind p) (function
     | OpenBracket ->
@@ -393,7 +405,7 @@ and parse_let p =
   let info : Ast.binding_info = { name; parameters; data_type } in
   (p, let_token.pos.start, info, bound_expr)
 
-(* let = "let" pattern { pattern } ":" type "=" expr *)
+(* let = "let", pattern, { pattern }, ":", type, "=", expr *)
 let let_binding p =
   let p, start, info, bound_expr = parse_let p in
   let node : Ast.t =
@@ -404,7 +416,7 @@ let let_binding p =
   in
   (p, node)
 
-(* data_arm = CAPITALISED_IDENTIFIER { type } *)
+(* data_arm = CAPITALISED_IDENTIFIER, { simple_type } *)
 let data_arm p =
   let p, token, constructor =
     expect_kind_with_lexeme CapitalisedIdentifier
@@ -419,7 +431,7 @@ let data_arm p =
   let arm : Ast.data_arm = { arm_pos; constructor; data_types } in
   (p, arm)
 
-(* data = "data" IDENTIFIER "=" [ "|" ] data_arm { "|" data_arm } *)
+(* data = "data", IDENTIFIER, "=", [ "|" ], data_arm, { "|", data_arm } *)
 let data_definition p =
   let p, data_token = advance p in
   let p, _, identifier =
@@ -436,7 +448,7 @@ let data_definition p =
   in
   (p, node)
 
-(* top_level = let | alias | data *)
+(* top_level = let | data *)
 let top_level p =
   let match_kind = function
     | Token.LetKeyword -> let_binding p

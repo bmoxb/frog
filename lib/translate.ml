@@ -31,6 +31,7 @@ let push_primary ?(location = Lambda) kind lexeme ~next_term =
   | _ -> Push (Variable lexeme, location, next_term)
 
 let binary_operator_to_fmc_name : Expr.binary_operator -> string = function
+  | Comma -> ";" (* TODO *)
   | And -> "&&"
   | Or -> "||"
   | Equiv -> "=="

@@ -24,6 +24,7 @@ type binding_info = {
 
 module Expr = struct
   type binary_operator =
+    | Comma
     | And
     | Or
     | Equiv
