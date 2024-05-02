@@ -1,6 +1,6 @@
 (** Frog's translator. Converts an AST into FMC terms. *)
 
-val translate_expr : Ast.Expr.t -> Fmc.t
+val translate_expr : ?next_term:Fmc.t -> Ast.Expr.t -> Fmc.t
 (** Convert a single expression into an FMC term. *)
 
 val translate : Ast.t list -> Fmc.t

@@ -1,6 +1,12 @@
 open Fmc
 open Ast
 
+let true_jump = Jmp "True"
+
+let false_jump = Jmp "False"
+
+let cont_jump = Jmp "Cont"
+
 let next_incremental_variable s =
   let len = String.length s in
   let rec traverse index =
@@ -14,14 +20,8 @@ let next_incremental_variable s =
 
 let lexeme_to_location s = Loc (String.sub s 1 (String.length s - 1))
 
-(* Evaluate/execute a primary expression. *)
-let eval_primary kind lexeme =
-  match kind with
-  | Expr.Location -> Pop (lexeme_to_location lexeme, "x", Variable "x")
-  | _ -> Variable lexeme
-
 (* Push a primary expression and continue with the specified term. *)
-let push_primary ?(location = Lambda) kind lexeme ~next_term =
+let push_primary ~next_term ?(location = Lambda) kind lexeme =
   match kind with
   | Expr.Location ->
       Pop
@@ -30,18 +30,31 @@ let push_primary ?(location = Lambda) kind lexeme ~next_term =
           Push (Variable "x", location, next_term) )
   | _ -> Push (Variable lexeme, location, next_term)
 
-let rec translate_expr (expr : Expr.t) =
-  match expr.kind with
-  | LetIn { info; bound_expr; in_expr } ->
-      translate_let_in info bound_expr in_expr
-  | Match (expr, arms) -> translate_match expr arms
-  | IfThenElse { condition_expr; then_expr; else_expr } ->
-      translate_if_then_else condition_expr then_expr else_expr
-  | BinOp (op, lhs, rhs) -> translate_bin_op op lhs rhs
-  | UnaryOp (op, expr) -> translate_unary_op op expr
-  | Application (fn, args) -> translate_application fn args
-  | Grouping expr -> translate_expr expr
-  | Primary (kind, lexeme) -> push_primary kind lexeme ~next_term:(Jump Skip)
+(* Evaluate/execute a primary expression. *)
+let eval_primary kind lexeme =
+  match kind with
+  | Expr.Location -> Pop (lexeme_to_location lexeme, "x", Variable "x")
+  | _ -> Variable lexeme
+
+(* Convert an expression to an FMC term that pushes the computed value and
+   continues with next_term. *)
+let rec translate_expr ?(next_term = Jump Skip) (expr : Expr.t) =
+  let term =
+    match expr.kind with
+    | LetIn { info; bound_expr; in_expr } ->
+        translate_let_in info bound_expr in_expr
+    | Match (expr, arms) -> translate_match expr arms
+    | IfThenElse { condition_expr; then_expr; else_expr } ->
+        translate_if_then_else condition_expr then_expr else_expr
+    | BinOp (op, lhs, rhs) -> translate_bin_op op lhs rhs
+    | UnaryOp (op, expr) -> translate_unary_op op expr
+    | Application (fn, args) -> translate_application fn args
+    | Grouping expr -> translate_expr expr
+    | Primary (kind, lexeme) -> push_primary ~next_term kind lexeme
+  in
+  match (expr.kind, next_term) with
+  | Primary _, _ | _, Jump Skip -> term
+  | _ -> Compose (term, next_term)
 
 (* Convert an expression to an FMC term that directly evaluates to the computed
    value. *)
@@ -50,17 +63,9 @@ and exec_expr (expr : Expr.t) =
   | Primary (kind, lexeme) -> eval_primary kind lexeme
   | _ -> Compose (translate_expr expr, Pop (Lambda, "x", Variable "x"))
 
-(* Convert an expression to an FMC term that pushes the computed value and
-   continues with next_term. *)
-and push_expr (expr : Expr.t) ~next_term =
-  match (expr.kind, next_term) with
-  | Primary (kind, lexeme), _ -> push_primary kind lexeme ~next_term
-  | _, Jump Skip -> translate_expr expr
-  | _ -> Compose (translate_expr expr, next_term)
-
 and push_expr_to_specific_location (expr : Expr.t) location ~next_term =
   match expr.kind with
-  | Primary (kind, lexeme) -> push_primary kind lexeme ~location ~next_term
+  | Primary (kind, lexeme) -> push_primary ~next_term kind lexeme ~location
   | _ ->
       Compose
         ( translate_expr expr,
@@ -69,11 +74,10 @@ and push_expr_to_specific_location (expr : Expr.t) location ~next_term =
 and expr_with_parameters_popped expr = function
   | head :: tail ->
       Pop (Lambda, head, Grouping (expr_with_parameters_popped expr tail))
-  | [] -> push_expr expr ~next_term:(Jump Skip)
+  | [] -> translate_expr expr
 
 and translate_let_in info bound_expr in_expr =
-  translate_let info bound_expr
-    ~next_term:(push_expr in_expr ~next_term:(Jump Skip))
+  translate_let info bound_expr ~next_term:(translate_expr in_expr)
 
 and translate_match expr arms =
   let rec translate_arms lhs_term = function
@@ -91,20 +95,18 @@ and translate_match expr arms =
 and translate_if_then_else condition_expr then_expr else_expr =
   let condition_term = exec_expr condition_expr in
   Join
-    ( Join
-        (condition_term, Jmp "True", push_expr then_expr ~next_term:(Jump Skip)),
-      Jmp "False",
-      push_expr else_expr ~next_term:(Jump Skip) )
+    ( Join (condition_term, true_jump, translate_expr then_expr),
+      false_jump,
+      translate_expr else_expr )
 
 and translate_bin_op op lhs rhs =
   let f op_string =
     let op_var = Variable op_string in
-    push_expr rhs ~next_term:(push_expr lhs ~next_term:op_var)
+    translate_expr rhs ~next_term:(translate_expr lhs ~next_term:op_var)
   in
   match op with
   (* TODO: For chain, discard the pushed value (if any). *)
-  | Chain | MultiReturn ->
-      push_expr lhs ~next_term:(push_expr rhs ~next_term:(Jump Skip))
+  | Chain | MultiReturn -> translate_expr lhs ~next_term:(translate_expr rhs)
   | And -> f "&&"
   | Or -> f "||"
   | Equiv -> f "=="
@@ -120,9 +122,9 @@ and translate_bin_op op lhs rhs =
 
 and translate_unary_op op expr =
   match op with
-  | Not -> push_expr expr ~next_term:(Variable "!")
+  | Not -> translate_expr expr ~next_term:(Variable "!")
   | Negate ->
-      push_expr expr ~next_term:(Push (Variable "0", Lambda, Variable "-"))
+      translate_expr expr ~next_term:(Push (Variable "0", Lambda, Variable "-"))
 
 and translate_application fn args =
   match fn.kind with
@@ -150,27 +152,31 @@ and translate_constructor_application jmp args =
         let next_arg_term =
           prepare_args_and_push_jump next_var (var :: vars_to_push) tail
         in
-        push_expr expr ~next_term:(Pop (Lambda, var, Grouping next_arg_term))
+        translate_expr expr
+          ~next_term:(Pop (Lambda, var, Grouping next_arg_term))
     | [] -> Push (jump_with_args_pushed vars_to_push, Lambda, Jump Skip)
   in
   prepare_args_and_push_jump "a" [] args
 
 and translate_function_application fn = function
   | expr :: tail ->
-      push_expr expr ~next_term:(translate_function_application fn tail)
+      translate_expr expr ~next_term:(translate_function_application fn tail)
   | [] -> exec_expr fn
 
 and translate_let info expr ~next_term =
   match info.parameters with
   (* Bind an expression that is evaluated immediately. *)
   | [] ->
-      push_expr expr ~next_term:(Pop (Lambda, info.name, Grouping next_term))
+      translate_expr expr
+        ~next_term:(Pop (Lambda, info.name, Grouping next_term))
   (* Bind a function that is evaluated only when called. *)
   | parameters ->
-      Push
-        ( expr_with_parameters_popped expr parameters,
-          Lambda,
-          Pop (Lambda, info.name, Grouping next_term) )
+      let term =
+        if info.recursive then
+          Loop (expr_with_parameters_popped expr parameters, cont_jump)
+        else expr_with_parameters_popped expr parameters
+      in
+      Push (term, Lambda, Pop (Lambda, info.name, Grouping next_term))
 
 let translate nodes =
   let rec translate_tracking_main ?main_expr = function
