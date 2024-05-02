@@ -243,18 +243,31 @@ and match_arm p : t * Ast.Expr.match_arm =
 
 (* arm_expr = let, "in", arm_expr
             | "if", expr, "then", expr, "else", arm_expr
-            | chain_expr *)
+            | chain_expr, [ ";", arm_expr ] *)
 and arm_expr p : t * Ast.Expr.t =
   match peek_kind p with
   | Some LetKeyword -> let_in ~last_rule:arm_expr p
   | Some IfKeyword -> if_then_else ~last_rule:arm_expr p
-  | _ -> chain_expr p
+  | _ -> chain_expr ~last_rule:arm_expr p
 
-(* chain_expr = multi_return, [ ";", chain_expr ] *)
-and chain_expr p =
-  left_associative_binary_expr multi_return (( = ) Ast.Expr.Chain) p
+(* chain_expr = multi_return, [ ";", expr ] *)
+and chain_expr ?(last_rule = expr) p =
+  let p, expr = multi_return p in
+  match peek_kind p with
+  | Some Semicolon ->
+      let p = advance_and_discard p in
+      let p, chained_expr = last_rule p in
+      let node : Ast.Expr.t =
+        {
+          kind = Ast.Expr.BinOp (Ast.Expr.Chain, expr, chained_expr);
+          pos = Position.merge expr.pos chained_expr.pos;
+        }
+      in
+      (p, node)
+  | _ -> (p, expr)
 
-and multi_return p =
+(* multi_return = logical_or, { ",", logical_or } *)
+and multi_return p : t * Ast.Expr.t =
   left_associative_binary_expr logical_or (( = ) Ast.Expr.MultiReturn) p
 
 (* logical_or = logical_and, { "or", logical_and } *)
@@ -357,14 +370,14 @@ and grouping p =
     | _ -> None)
 
 (* Helper function for parsing left associative binary expressions. *)
-and left_associative_binary_expr child_expr is_wanted_op p =
-  let p, left_expr = child_expr p in
+and left_associative_binary_expr child_rule is_wanted_op p =
+  let p, left_expr = child_rule p in
   match Option.bind (peek_kind p) token_kind_to_binary_operator with
   | Some op when is_wanted_op op ->
       (* Consume the operator token. *)
       let p = advance_and_discard p in
       let p, right_expr =
-        left_associative_binary_expr child_expr is_wanted_op p
+        left_associative_binary_expr child_rule is_wanted_op p
       in
       let node : Ast.Expr.t =
         {
