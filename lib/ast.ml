@@ -17,6 +17,7 @@ type binding_info = {
   name : identifier;
   parameters : identifier list;
   data_type : DataType.t;
+  recursive : bool;
 }
 [@@deriving show]
 (** All information associated with a let binding except the bound expression
