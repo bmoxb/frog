@@ -30,21 +30,6 @@ let push_primary ?(location = Lambda) kind lexeme ~next_term =
           Push (Variable "x", location, next_term) )
   | _ -> Push (Variable lexeme, location, next_term)
 
-let binary_operator_to_fmc_name : Expr.binary_operator -> string = function
-  | Comma -> ";" (* TODO *)
-  | And -> "&&"
-  | Or -> "||"
-  | Equiv -> "=="
-  | NotEquiv -> "!="
-  | GreaterThan -> ">"
-  | LessThan -> "<"
-  | GreaterThanOrEqual -> ">="
-  | LessThanOrEqual -> "<="
-  | Add -> "+"
-  | Subtract -> "-"
-  | Multiply -> "*"
-  | Divide -> "/"
-
 let rec translate_expr (expr : Expr.t) =
   match expr.kind with
   | LetIn { info; bound_expr; in_expr } ->
@@ -56,7 +41,6 @@ let rec translate_expr (expr : Expr.t) =
   | UnaryOp (op, expr) -> translate_unary_op op expr
   | Application (fn, args) -> translate_application fn args
   | Grouping expr -> translate_expr expr
-  | Chain (lhs, rhs) -> Compose (translate_expr lhs, translate_expr rhs)
   | Primary (kind, lexeme) -> push_primary kind lexeme ~next_term:(Jump Skip)
 
 (* Convert an expression to an FMC term that directly evaluates to the computed
@@ -114,8 +98,26 @@ and translate_if_then_else condition_expr then_expr else_expr =
       push_expr else_expr ~next_term:(Jump Skip) )
 
 and translate_bin_op op lhs rhs =
-  let op_var = Variable (binary_operator_to_fmc_name op) in
-  push_expr rhs ~next_term:(push_expr lhs ~next_term:op_var)
+  let f op_string =
+    let op_var = Variable op_string in
+    push_expr rhs ~next_term:(push_expr lhs ~next_term:op_var)
+  in
+  match op with
+  (* TODO: For chain, discard the pushed value (if any). *)
+  | Chain | MultiReturn ->
+      push_expr lhs ~next_term:(push_expr rhs ~next_term:(Jump Skip))
+  | And -> f "&&"
+  | Or -> f "||"
+  | Equiv -> f "=="
+  | NotEquiv -> f "!="
+  | GreaterThan -> f ">"
+  | LessThan -> f "<"
+  | GreaterThanOrEqual -> f ">="
+  | LessThanOrEqual -> f "<="
+  | Add -> f "+"
+  | Subtract -> f "-"
+  | Multiply -> f "*"
+  | Divide -> f "/"
 
 and translate_unary_op op expr =
   match op with

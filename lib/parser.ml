@@ -134,6 +134,8 @@ and expect_simple_type p =
 let token_kind_to_binary_operator =
   let open Ast.Expr in
   function
+  | Token.Semicolon -> Some Chain
+  | Token.Comma -> Some MultiReturn
   | Token.AndKeyword -> Some And
   | Token.OrKeyword -> Some Or
   | Token.Equiv -> Some Equiv
@@ -250,23 +252,10 @@ and arm_expr p : t * Ast.Expr.t =
 
 (* chain_expr = multi_return, [ ";", chain_expr ] *)
 and chain_expr p =
-  let p, lhs = multi_return p in
-  match peek_kind p with
-  | Some Semicolon ->
-      (* Consume the semicolon. *)
-      let p = advance_and_discard p in
-      let p, rhs = chain_expr p in
-      let node : Ast.Expr.t =
-        {
-          pos = Position.merge lhs.pos rhs.pos;
-          kind = Ast.Expr.Chain (lhs, rhs);
-        }
-      in
-      (p, node)
-  | _ -> (p, lhs)
+  left_associative_binary_expr multi_return (( = ) Ast.Expr.Chain) p
 
-and multi_return p : t * Ast.Expr.t =
-  left_associative_binary_expr logical_or (( = ) Ast.Expr.Comma) p
+and multi_return p =
+  left_associative_binary_expr logical_or (( = ) Ast.Expr.MultiReturn) p
 
 (* logical_or = logical_and, { "or", logical_and } *)
 and logical_or p =

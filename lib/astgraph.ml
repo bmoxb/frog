@@ -75,12 +75,6 @@ let rec expr_to_tree_vertex (expr : Ast.Expr.t) =
           :: List.mapi arg_to_edge args )
     | Grouping expr ->
         ("grouping", [ Tree.edge ~label:"expr" (expr_to_tree_vertex expr) ])
-    | Chain (lhs, rhs) ->
-        ( "chain",
-          [
-            Tree.edge (expr_to_tree_vertex lhs);
-            Tree.edge (expr_to_tree_vertex rhs);
-          ] )
     | Primary (kind, value) ->
         (* Need to escape quotes properly if a string literal. *)
         let value =
