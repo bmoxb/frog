@@ -110,23 +110,23 @@ let tests =
            ]
        @ test_translate_top_levels "main"
            [
-             ("let main : int = 10", "10");
-             ("let main : int = 10 + 2", "[2].[10].+; <x>.x");
+             ("let main : int = 10", "[10]");
+             ("let main : int = 10 + 2", "[2].[10].+");
            ]
        @ test_translate_top_levels "let binding constant"
            [
              ( "let a : int = 5 \n let main : @in -> int = @in + a",
-               "[5].<a>.([a].in<x>.[x].+; <x>.x)" );
+               "[5].<a>.([a].in<x>.[x].+)" );
              ( "let a : int = 5 \n\
                \ let b : int = 10 \n\
                \ let main : @in -> int = a + b / @in",
-               "[5].<a>.([10].<b>.(in<x>.[x].[b]./; [a].+; <x>.x))" );
+               "[5].<a>.([10].<b>.(in<x>.[x].[b]./; [a].+))" );
            ]
        @ test_translate_top_levels "let function"
            [
              ( "let f a : int -> int = a + 2 * 2 \n\
                \ let main : @in -> int = f @in",
-               "[<a>.([2].[2].*; [a].+)].<f>.(in<x>.[x].f; <x>.x)" );
+               "[<a>.([2].[2].*; [a].+)].<f>.(in<x>.[x].f)" );
            ]
 
 let () = run_test_tt_main tests

@@ -45,19 +45,18 @@ let rec translate_expr (expr : Expr.t) =
 
 (* Convert an expression to an FMC term that directly evaluates to the computed
    value. *)
-and eval_expr (expr : Expr.t) =
+and exec_expr (expr : Expr.t) =
   match expr.kind with
   | Primary (kind, lexeme) -> eval_primary kind lexeme
   | _ -> Compose (translate_expr expr, Pop (Lambda, "x", Variable "x"))
 
-(* Convert an expression to an FMC term that pushes the computed value. *)
+(* Convert an expression to an FMC term that pushes the computed value and
+   continues with next_term. *)
 and push_expr (expr : Expr.t) ~next_term =
-  match expr.kind with
-  | Primary (kind, lexeme) -> push_primary kind lexeme ~next_term
-  | _ -> (
-      match next_term with
-      | Jump Skip -> translate_expr expr
-      | _ -> Compose (translate_expr expr, next_term))
+  match (expr.kind, next_term) with
+  | Primary (kind, lexeme), _ -> push_primary kind lexeme ~next_term
+  | _, Jump Skip -> translate_expr expr
+  | _ -> Compose (translate_expr expr, next_term)
 
 and push_expr_to_specific_location (expr : Expr.t) location ~next_term =
   match expr.kind with
@@ -87,10 +86,10 @@ and translate_match expr arms =
         translate_arms next_lhs_term tail
     | [] -> lhs_term
   in
-  translate_arms (eval_expr expr) arms
+  translate_arms (exec_expr expr) arms
 
 and translate_if_then_else condition_expr then_expr else_expr =
-  let condition_term = eval_expr condition_expr in
+  let condition_term = exec_expr condition_expr in
   Join
     ( Join
         (condition_term, Jmp "True", push_expr then_expr ~next_term:(Jump Skip)),
@@ -159,7 +158,7 @@ and translate_constructor_application jmp args =
 and translate_function_application fn = function
   | expr :: tail ->
       push_expr expr ~next_term:(translate_function_application fn tail)
-  | [] -> eval_expr fn
+  | [] -> exec_expr fn
 
 and translate_let info expr ~next_term =
   match info.parameters with
@@ -185,7 +184,8 @@ let translate nodes =
     (* Once all nodes are traversed, insert the translated main function at the
        end. *)
     | [] ->
-        main_expr |> Option.map eval_expr |> Option.value ~default:(Jump Skip)
+        main_expr |> Option.map translate_expr
+        |> Option.value ~default:(Jump Skip)
     (* Skip data definitions as they do not require translation. *)
     | { kind = Data _; _ } :: tail -> translate_tracking_main ?main_expr tail
   in
