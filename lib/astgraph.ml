@@ -1,7 +1,10 @@
 let rec data_type_to_tree_vertex (data_type : Ast.DataType.t) =
   let label, edges =
     match data_type.kind with
-    | Simple (_, identifier) -> (identifier, [])
+    | Primary (_, lexeme) -> (lexeme, [])
+    | Grouping data_type ->
+        ( "grouping",
+          [ Tree.edge ~label:"type" (data_type_to_tree_vertex data_type) ] )
     | Function { inputs; outputs } ->
         let data_type_to_edge data_type =
           Tree.edge (data_type_to_tree_vertex data_type)

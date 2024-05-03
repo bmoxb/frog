@@ -16,7 +16,7 @@ let reverse l : list -> list =
     loop l Nil
 
 # Apply some function f to each element in a list.
-let map f l : list -> list =
+let map f l : (int -> int) list -> list =
     let rec loop old new : list list -> list =
         match old with
         | Cons head tail -> loop tail (Cons (f head) new)

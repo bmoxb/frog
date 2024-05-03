@@ -3,13 +3,14 @@
 type identifier = string [@@deriving show]
 
 module DataType = struct
-  type simple_kind = Identifier | Location [@@deriving show]
+  type primary_kind = Identifier | Location [@@deriving show]
 
   type t = { pos : Position.t; kind : kind }
 
   and kind =
-    | Simple of simple_kind * identifier
     | Function of { inputs : t list; outputs : t list }
+    | Primary of primary_kind * identifier
+    | Grouping of t
   [@@deriving show]
 end
 

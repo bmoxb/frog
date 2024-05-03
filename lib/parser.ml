@@ -80,29 +80,29 @@ let parse_arms parse_arm p =
   let last_arm = Option.value ~default:head_arm last_arm_opt in
   (p, last_arm, head_arm :: tail_arms)
 
-let token_kind_to_simple_type_kind =
+let token_kind_to_primary_type_kind =
   let open Ast.DataType in
   function
   | Token.Identifier -> Some Identifier
   | Token.LocationIdentifier -> Some Location
   | _ -> None
 
-(* type = simple_type, [ { simple_type }, "->", simple_type, { simple_type } ] *)
+(* type = primary_type, [ { primary_type }, "->", primary_type, { primary_type } ] *)
 let rec data_type p =
-  (* Either map a simple type into a function type (if possible) or return as
+  (* Either map a primary type into a function type (if possible) or return as
      is. *)
   let try_into_function_type (p, in_head) =
-    let p, _, in_tail = any_number_of simple_type p in
-    (* If there are no following simple types or a '->' token, then this must
-       just be a single simple type rather than a function type. *)
+    let p, _, in_tail = any_number_of primary_type p in
+    (* If there are no following primary types or a '->' token, then this must
+       just be a single primary type rather than a function type. *)
     if List.is_empty in_tail && peek_kind p <> Some Arrow then (p, in_head)
     else
       let p, _ = expect_kind Arrow "Expected '->' in function type." p in
-      let p, (out_head : Ast.DataType.t) = expect_simple_type p in
-      let p, last_simple_type_opt, out_tail = any_number_of simple_type p in
+      let p, (out_head : Ast.DataType.t) = expect_primary_type p in
+      let p, last_primary_type_opt, out_tail = any_number_of primary_type p in
       (* Set up a function data type AST node. *)
       let last_pos =
-        (last_simple_type_opt |> Option.value ~default:out_head).pos
+        (last_primary_type_opt |> Option.value ~default:out_head).pos
       in
       let inputs, outputs = (in_head :: in_tail, out_head :: out_tail) in
       let node : Ast.DataType.t =
@@ -113,23 +113,42 @@ let rec data_type p =
       in
       (p, node)
   in
-  simple_type p |> Option.map try_into_function_type
+  primary_type p |> Option.map try_into_function_type
 
 and expect_data_type p = expect_or_syntax_error data_type "Expected a type." p
 
-(* simple_type = IDENTIFIER | LOCATION_IDENTIFIER *)
-and simple_type p =
-  Option.bind (peek_kind p) token_kind_to_simple_type_kind
-  |> Option.map (fun kind ->
-         let p, token = advance p in
-         let identifier = Token.lexeme p.source_code token in
-         let node : Ast.DataType.t =
-           { pos = token.pos; kind = Ast.DataType.Simple (kind, identifier) }
-         in
-         (p, node))
+(* primary_type = IDENTIFIER | LOCATION_IDENTIFIER | grouping_type *)
+and primary_type p =
+  match Option.bind (peek_kind p) token_kind_to_primary_type_kind with
+  | Some kind ->
+      let p, token = advance p in
+      let lexeme = Token.lexeme p.source_code token in
+      let node : Ast.DataType.t =
+        { pos = token.pos; kind = Ast.DataType.Primary (kind, lexeme) }
+      in
+      Some (p, node)
+  | None -> grouping_type p
 
-and expect_simple_type p =
-  expect_or_syntax_error simple_type "Expected a simple type." p
+(* grouping_type = "(", type, ")" *)
+and grouping_type p =
+  Option.bind (peek_kind p) (function
+    | OpenBracket ->
+        let p, open_token = advance p in
+        let p, data_type = expect_data_type p in
+        let p, close_token =
+          expect_kind CloseBracket "Expected closing ')' token." p
+        in
+        let node : Ast.DataType.t =
+          {
+            pos = Position.merge open_token.pos close_token.pos;
+            kind = Ast.DataType.Grouping data_type;
+          }
+        in
+        Some (p, node)
+    | _ -> None)
+
+and expect_primary_type p =
+  expect_or_syntax_error primary_type "Expected a primary type." p
 
 let token_kind_to_binary_operator =
   let open Ast.Expr in
@@ -423,13 +442,13 @@ let let_binding p =
   in
   (p, node)
 
-(* data_arm = CAPITALISED_IDENTIFIER, { simple_type } *)
+(* data_arm = CAPITALISED_IDENTIFIER, { primary_type } *)
 let data_arm p =
   let p, token, constructor =
     expect_kind_with_lexeme CapitalisedIdentifier
       "Expected a constructor identifier." p
   in
-  let p, last_data_type_opt, data_types = any_number_of simple_type p in
+  let p, last_data_type_opt, data_types = any_number_of primary_type p in
   let arm_pos =
     match last_data_type_opt with
     | Some last -> Position.merge token.pos last.pos
