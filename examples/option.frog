@@ -6,7 +6,7 @@ let bind f o : (int -> option) option -> option =
     | Some x -> f x
     | None   -> None
 
-# `map f o` if `Some (f x)` if `o` is Some `x`, and `None` otherwise.
+# `map f o` is `Some (f x)` if `o` is Some `x`, and `None` otherwise.
 let map f o : (int -> int) option -> option =
     match o with
     | Some x -> Some (f x)
@@ -20,5 +20,5 @@ let main : @in -> @out =
     let add_n x : int -> int = x + n in
     let opt : option = map add_n (Some 5) in
     @out (get opt);
-    let return_none x : int -> option = None in
+    let return_none _ : int -> option = None in
     @out (get (bind return_none opt))
