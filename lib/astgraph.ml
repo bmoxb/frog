@@ -1,9 +1,7 @@
 let rec data_type_to_tree_vertex (data_type : Ast.DataType.t) =
   let label, edges =
     match data_type.kind with
-    | Simple (kind, identifier) ->
-        ( Ast.DataType.show_simple_kind kind,
-          [ Tree.edge (Tree.vertex identifier) ] )
+    | Simple (_, identifier) -> (identifier, [])
     | Function { inputs; outputs } ->
         let data_type_to_edge data_type =
           Tree.edge (data_type_to_tree_vertex data_type)
@@ -21,9 +19,7 @@ let rec data_type_to_tree_vertex (data_type : Ast.DataType.t) =
 
 let function_parameters_to_edges =
   let parameter_to_edge index parameter =
-    Tree.edge
-      ~label:(Printf.sprintf "parameter %d" index)
-      (Tree.vertex parameter)
+    Tree.edge ~label:(Printf.sprintf "param %d" index) (Tree.vertex parameter)
   in
   List.mapi parameter_to_edge
 
@@ -91,8 +87,7 @@ let rec expr_to_tree_vertex (expr : Ast.Expr.t) =
               "\\" ^ last_quote_removed ^ "\\\""
           | _ -> value
         in
-        ( "primary",
-          [ Tree.edge ~label:(show_primary_kind kind) (Tree.vertex value) ] )
+        (value, [])
   in
   Tree.vertex ~colour:(Tree.rgb 0.1 0.1 1.0) ~edges label
 
@@ -105,7 +100,7 @@ and match_arms_to_edges arms =
       arm.parameters
       |> List.mapi (fun index parameter ->
              Tree.edge
-               ~label:(Printf.sprintf "parameter %d" index)
+               ~label:(Printf.sprintf "param %d" index)
                (Tree.vertex parameter))
     in
     let expr_edge = Tree.edge ~label:"expr" (expr_to_tree_vertex arm.expr) in
@@ -125,7 +120,7 @@ let data_arms_to_edges =
       arm.data_types
       |> List.mapi (fun i data_type ->
              Tree.edge
-               ~label:(Printf.sprintf "parameter type %d" i)
+               ~label:(Printf.sprintf "param type %d" i)
                (data_type_to_tree_vertex data_type))
     in
     Tree.edge
