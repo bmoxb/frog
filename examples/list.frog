@@ -1,26 +1,43 @@
 data list = Cons int list | Nil
 
-# Return true if the second element of the list is n, otherwise false.
-# Demonstrates nesting of match expressions.
-let is_second_element n head : int list -> bool =
-    match head with
-    | Cons _ next -> (match next with
-                      | Cons m _ -> n == m
-                      | Nil -> False)
-    | Nil         -> False
+# Print out each value in a list.
+let rec print l : list -> @out =
+    match l with
+    | Cons head tail -> @out head; print tail
+    | Nil            -> @out ""
+
+# Reverse a list.
+let reverse l : list -> list =
+    let rec loop old new : list list -> list =
+        match old with
+        | Cons head tail -> loop tail (Cons head new)
+        | Nil            -> new
+    in
+    loop l Nil
+
+# Apply some function f to each element in a list.
+let map f l : list -> list =
+    let rec loop old new : list list -> list =
+        match old with
+        | Cons head tail -> loop tail (Cons (f head) new)
+        | Nil            -> reverse new
+    in
+    loop l Nil
 
 # Sum the values in a list.
-let sum list : list -> int =
-    # Recursive calls must be in the tail position so use an accumulator.
-    let with_accumulator l accum : list int -> int =
+let sum l : list -> int =
+    let rec loop l acc : list int -> int =
         match l with
-        | Cons head tail -> with_accumulator tail (accum + head)
-        | Nil            -> accum
+        | Cons head tail -> loop tail (acc + head)
+        | Nil            -> acc
     in
-    with_accumulator list 0
+    loop l 0
 
-let main : @in -> @out =
-    let l : list = Cons 1 (Cons 2 (Cons 3 Nil)) in
-    let input : int = @in in
-    @out (sum l);
-    @out (is_second_element input l)
+let main : unit -> @out =
+    let old : list = Cons 5 (Cons 10 (Cons 15 (Cons 20 Nil))) in
+    print old;
+    let n : int = @in in
+    let times_n x : int -> int = x * n in
+    let new : list =  map times_n old in
+    print new;
+    @out (sum new)

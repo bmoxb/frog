@@ -393,6 +393,11 @@ and left_associative_binary_expr child_rule is_wanted_op p =
    (for position tracking), the binding info, and the bound expression. *)
 and parse_let p =
   let p, let_token = advance p in
+  let p, recursive =
+    match peek_kind p with
+    | Some RecKeyword -> (advance_and_discard p, true)
+    | _ -> (p, false)
+  in
   let p, _, name =
     expect_kind_with_lexeme Identifier "Expected name to bind to." p
   in
@@ -404,10 +409,10 @@ and parse_let p =
   let p, data_type = expect_data_type p in
   let p, _ = expect_kind Equals "Expected '=' token." p in
   let p, bound_expr = expr p in
-  let info : Ast.binding_info = { name; parameters; data_type } in
+  let info : Ast.binding_info = { name; parameters; data_type; recursive } in
   (p, let_token.pos.start, info, bound_expr)
 
-(* let = "let", pattern, { pattern }, ":", type, "=", expr *)
+(* let = "let", [ "rec" ], pattern, { pattern }, ":", type, "=", expr *)
 let let_binding p =
   let p, start, info, bound_expr = parse_let p in
   let node : Ast.t =

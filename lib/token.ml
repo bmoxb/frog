@@ -35,6 +35,7 @@ type kind =
   | ThenKeyword
   | ElseKeyword
   | LetKeyword
+  | RecKeyword
   | InKeyword
   | DataKeyword
   | MatchKeyword
@@ -56,6 +57,7 @@ let lookup_identifier_or_keyword = function
   | "then" -> ThenKeyword
   | "else" -> ElseKeyword
   | "let" -> LetKeyword
+  | "rec" -> RecKeyword
   | "in" -> InKeyword
   | "data" -> DataKeyword
   | "match" -> MatchKeyword

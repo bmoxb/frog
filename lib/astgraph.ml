@@ -31,8 +31,13 @@ let rec expr_to_tree_vertex (expr : Ast.Expr.t) =
   let open Ast.Expr in
   let label, edges =
     match expr.kind with
-    | LetIn { info = { name; parameters; data_type }; bound_expr; in_expr } ->
-        ( "let-in",
+    | LetIn
+        {
+          info = { name; parameters; data_type; recursive };
+          bound_expr;
+          in_expr;
+        } ->
+        ( (if recursive then "letrec-in" else "let-in"),
           Tree.edge ~label:"name" (Tree.vertex name)
           :: function_parameters_to_edges parameters
           @ [
@@ -133,8 +138,8 @@ let data_arms_to_edges =
 let node_to_tree_vertex (node : Ast.t) =
   let label, edges =
     match node.kind with
-    | Let ({ name; parameters; data_type }, expr) ->
-        ( "let",
+    | Let ({ name; parameters; data_type; recursive }, expr) ->
+        ( (if recursive then "letrec" else "let"),
           Tree.edge ~label:"name" (Tree.vertex name)
           :: function_parameters_to_edges parameters
           @ [
