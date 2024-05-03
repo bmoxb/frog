@@ -1,13 +1,13 @@
 # Calculate the factorial of a given integer.
 let factorial input : int -> int =
     # Recursive calls must be in the tail position so use an accumulator.
-    let rec with_accumulator n accum : int int -> int =
+    let rec loop n acc : int int -> int =
         if n > 1 then
-            with_accumulator (n - 1) (n * accum)
+            loop (n - 1) (n * acc)
         else
-            accum
+            acc
     in
-    with_accumulator input 1
+    loop input 1
 
 let main : @in -> @out =
     @out "n = ";
