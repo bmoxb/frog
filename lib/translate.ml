@@ -7,6 +7,8 @@ let false_jump = Jmp "False"
 
 let cont_jump = Jmp "Cont"
 
+(* Generate incremental letter variable names. Uses to create temporary
+   variables for the purpose of translating data constructors correctly. *)
 let next_incremental_variable s =
   let len = String.length s in
   let rec traverse index =
@@ -18,6 +20,7 @@ let next_incremental_variable s =
   in
   traverse 0
 
+(* Remove the '@' prefix from a location lexeme and wrap it in Loc. *)
 let lexeme_to_location s = Loc (String.sub s 1 (String.length s - 1))
 
 (* Push a primary expression and continue with the specified term. *)
@@ -60,6 +63,7 @@ and exec_expr ?recname (expr : Expr.t) =
   | Primary (_, lexeme) -> Variable lexeme
   | _ -> Compose (push_expr expr, Pop (Lambda, "x", Variable "x"))
 
+(* Push the resulting value of an expression to the specified location. *)
 and push_expr_to_specific_location (expr : Expr.t) location ~next_term =
   match expr.kind with
   | Primary (kind, lexeme) -> push_primary ~next_term kind lexeme ~location
